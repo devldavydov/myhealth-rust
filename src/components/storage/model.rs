@@ -53,7 +53,7 @@ pub struct Bundle {
     pub data: HashMap<String, f64>
 }
 
-pub trait Storage {
+pub trait Storage: Send + Sync {
     // Food
     fn get_food(&self, key: &str) -> Result<Food>;
     fn get_food_list(&self) -> Result<Vec<Food>>;
