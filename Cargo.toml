@@ -3,11 +3,34 @@ name = "myhealth"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
+[[bin]]
+name = "myhealth"
+path = "src/main.rs"
+
+[workspace]
+members = [
+    ".",
+    "lib/model",
+    "lib/storage",
+    "lib/types",
+    "services/bot"
+]
+
+[workspace.dependencies]
+model = { path = "lib/model" }
+storage = { path = "lib/storage" }
+types = { path = "lib/types" }
+bot = { path = "services/bot" }
+
+chrono = "0"
+anyhow = "1"
 teloxide = { version = "0.13", default-features = false, features = ["macros", "rustls", "ctrlc_handler"] }
 log = "0.4"
 pretty_env_logger = "0.5"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
-chrono = "0"
-anyhow = "1"
+
+[dependencies]
+bot = { workspace = true }
+
+anyhow = { workspace = true }
 clap = { version = "4", features = ["derive"] }

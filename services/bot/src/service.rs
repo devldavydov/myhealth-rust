@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::error::Error;
 
 use teloxide::prelude::*;
-use crate::components::storage::{model::Storage, storage_sqlite::StorageSqlite};
+use storage::{Storage, storage_sqlite::StorageSqlite};
 
 use super::cmd_proc::CommandProcessor;
 use anyhow::Result;
@@ -23,7 +23,10 @@ impl Service {
         Self { config }
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub fn run(&self) -> Result<()> {
+        pretty_env_logger::init();
+        log::info!("Starting MyHealth bot...");
+
         let bot = Bot::new(self.config.token.clone());
 
         let handler = dptree::entry()           
@@ -33,12 +36,18 @@ impl Service {
 
         let stg: Arc<Box<dyn Storage>> = Arc::new(Box::new(StorageSqlite::new()?));
 
-        Dispatcher::builder(bot, handler)
-            .dependencies(dptree::deps![stg, self.config.allowed_user_ids.clone()])
-            .enable_ctrlc_handler()
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
             .build()
-            .dispatch()
-            .await;
+            .unwrap()
+            .block_on(async {
+                Dispatcher::builder(bot, handler)
+                .dependencies(dptree::deps![stg, self.config.allowed_user_ids.clone()])
+                .enable_ctrlc_handler()
+                .build()
+                .dispatch()
+                .await;
+            });       
 
         Ok(())
     }

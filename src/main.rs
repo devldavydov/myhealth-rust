@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use myhealth::services::bot::service::{Config, Service};
+use bot::service::{Config, Service};
 use anyhow::Result;
 use clap::Parser;
 
@@ -13,13 +13,9 @@ struct Args {
     allowed_user_ids: Vec<u64>,
 }
 
-#[tokio::main]
-async fn main() -> Result<()>{
-    pretty_env_logger::init();
-    log::info!("Starting MyHealth bot...");
-
+fn main() -> Result<()>{
     let bot_service = Service::new(parse_config());
-    bot_service.run().await
+    bot_service.run()
 }
 
 fn parse_config() -> Config {

@@ -1,8 +1,6 @@
 use teloxide::prelude::*;
 use std::sync::Arc;
-
-use crate::components::storage::model::Storage;
-
+use storage::Storage;
 pub struct CommandProcessor;
 
 impl CommandProcessor {
