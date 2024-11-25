@@ -53,8 +53,8 @@ pub struct Bundle {
 
 impl Food {
     pub fn validate(&self) -> bool {
-        self.key != ""
-            && self.name != ""
+        !self.key.is_empty()
+            && !self.name.is_empty()
             && self.cal100 >= 0.0
             && self.prot100 >= 0.0
             && self.fat100 >= 0.0
@@ -64,7 +64,7 @@ impl Food {
 
 impl Weight {
     pub fn validate(&self) -> bool {
-        self.value >= 0.0
+        self.value > 0.0
     }
 }
 
@@ -97,7 +97,7 @@ impl From<Meal> for String {
 
 impl Journal {
     pub fn validate(&self) -> bool {
-        self.food_key != "" && self.food_weight > 0.0
+        !self.food_key.is_empty() && self.food_weight > 0.0
     }
 }
 
@@ -109,16 +109,222 @@ impl UserSettings {
 
 impl Bundle {
     pub fn validate(&self) -> bool {
-        if self.key == "" || self.data.len() == 0 {
+        if self.key.is_empty() || self.data.is_empty() {
             return false;
         }
 
-        for (_, v) in &self.data {
+        for v in self.data.values() {
             if *v < 0.0 {
                 return false;
             }
         }
 
         true
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use types::timestamp::Timestamp;
+
+    use crate::{Bundle, Food, Journal, Meal, UserSettings, Weight};
+
+    #[test]
+    fn test_validate_food() {
+        for t in vec![
+            (
+                Food {
+                    key: "".into(),
+                    name: "".into(),
+                    brand: "brand".into(),
+                    cal100: -1.0,
+                    prot100: -1.0,
+                    fat100: -1.0,
+                    carb100: -1.0,
+                    comment: "".into(),
+                },
+                false,
+            ),
+            (
+                Food {
+                    key: "key".into(),
+                    name: "".into(),
+                    brand: "brand".into(),
+                    cal100: -1.0,
+                    prot100: -1.0,
+                    fat100: -1.0,
+                    carb100: -1.0,
+                    comment: "".into(),
+                },
+                false,
+            ),
+            (
+                Food {
+                    key: "key".into(),
+                    name: "name".into(),
+                    brand: "brand".into(),
+                    cal100: -1.0,
+                    prot100: -1.0,
+                    fat100: -1.0,
+                    carb100: -1.0,
+                    comment: "".into(),
+                },
+                false,
+            ),
+            (
+                Food {
+                    key: "key".into(),
+                    name: "name".into(),
+                    brand: "brand".into(),
+                    cal100: 1.0,
+                    prot100: -1.0,
+                    fat100: -1.0,
+                    carb100: -1.0,
+                    comment: "".into(),
+                },
+                false,
+            ),
+            (
+                Food {
+                    key: "key".into(),
+                    name: "name".into(),
+                    brand: "brand".into(),
+                    cal100: 1.0,
+                    prot100: 1.0,
+                    fat100: -1.0,
+                    carb100: -1.0,
+                    comment: "".into(),
+                },
+                false,
+            ),
+            (
+                Food {
+                    key: "key".into(),
+                    name: "name".into(),
+                    brand: "brand".into(),
+                    cal100: 1.0,
+                    prot100: 1.0,
+                    fat100: 1.0,
+                    carb100: -1.0,
+                    comment: "".into(),
+                },
+                false,
+            ),
+            (
+                Food {
+                    key: "key".into(),
+                    name: "name".into(),
+                    brand: "brand".into(),
+                    cal100: 1.0,
+                    prot100: 1.0,
+                    fat100: 1.0,
+                    carb100: 1.0,
+                    comment: "".into(),
+                },
+                true,
+            ),
+        ] {
+            assert_eq!(t.0.validate(), t.1);
+        }
+    }
+
+    #[test]
+    fn test_validate_weight() {
+        assert!(!Weight {
+            timestamp: Timestamp::now(),
+            value: 0.0
+        }
+        .validate());
+        assert!(Weight {
+            timestamp: Timestamp::now(),
+            value: 1.0
+        }
+        .validate());
+    }
+
+    #[test]
+    fn test_validate_journal() {
+        for t in vec![
+            (
+                Journal {
+                    timestamp: Timestamp::now(),
+                    meal: Meal::Breakfast,
+                    food_key: "".into(),
+                    food_weight: 0.0,
+                },
+                false,
+            ),
+            (
+                Journal {
+                    timestamp: Timestamp::now(),
+                    meal: Meal::Breakfast,
+                    food_key: "key".into(),
+                    food_weight: 0.0,
+                },
+                false,
+            ),
+            (
+                Journal {
+                    timestamp: Timestamp::now(),
+                    meal: Meal::Breakfast,
+                    food_key: "key".into(),
+                    food_weight: 1.0,
+                },
+                true,
+            ),
+        ] {
+            assert_eq!(t.0.validate(), t.1);
+        }
+    }
+
+    #[test]
+    fn test_validate_user_settings() {
+        assert!(!UserSettings { cal_limit: 0.0 }.validate());
+        assert!(UserSettings { cal_limit: 1.0 }.validate());
+    }
+
+    #[test]
+    fn test_validate_bundle() {
+        for t in vec![
+            (
+                Bundle {
+                    key: "".into(),
+                    data: HashMap::default(),
+                },
+                false,
+            ),
+            (
+                Bundle {
+                    key: "key".into(),
+                    data: HashMap::default(),
+                },
+                false,
+            ),
+            (
+                Bundle {
+                    key: "key".into(),
+                    data: HashMap::default(),
+                },
+                false,
+            ),
+            (
+                Bundle {
+                    key: "key".into(),
+                    data: HashMap::from_iter(vec![("bundle".into(), 0.0), ("food".into(), -1.0)]),
+                },
+                false,
+            ),
+            (
+                Bundle {
+                    key: "key".into(),
+                    data: HashMap::from_iter(vec![("bundle".into(), 0.0), ("food".into(), 1.0)]),
+                },
+                true,
+            ),
+        ] {
+            assert_eq!(t.0.validate(), t.1);
+        }
     }
 }

@@ -1,15 +1,12 @@
-use std::error::Error;
 use std::sync::Arc;
 
 use storage::{storage_sqlite::StorageSqlite, Storage};
 use teloxide::prelude::*;
 
 use super::args::ArgsCli;
-use super::cmd_proc::CommandProcessor;
+use super::cmd;
 use super::config::Config;
 use anyhow::Result;
-
-pub type HandlerResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 pub struct App {
     config: Config,
@@ -37,7 +34,7 @@ impl service::Service for App {
         let handler = dptree::entry().branch(
             Update::filter_message()
                 .filter(App::filter_allowed_users)
-                .endpoint(CommandProcessor::process_command),
+                .endpoint(cmd::process_command),
         );
 
         let stg: Arc<Box<dyn Storage>> = Arc::new(Box::new(StorageSqlite::new()?));
