@@ -6,14 +6,10 @@ use teloxide::prelude::*;
 
 use super::args::ArgsCli;
 use super::cmd_proc::CommandProcessor;
+use super::config::Config;
 use anyhow::Result;
 
 pub type HandlerResult = Result<(), Box<dyn Error + Send + Sync>>;
-
-pub struct Config {
-    pub token: String,
-    pub allowed_user_ids: Arc<Vec<u64>>,
-}
 
 pub struct App {
     config: Config,
@@ -22,10 +18,7 @@ pub struct App {
 impl App {
     pub fn new(args: ArgsCli) -> Self {
         Self {
-            config: Config {
-                token: args.token,
-                allowed_user_ids: Arc::new(args.allowed_user_ids),
-            },
+            config: Config::new(args),
         }
     }
 
