@@ -1,10 +1,9 @@
 use crate::Storage;
-use model::{Food, Bundle, Weight, UserSettings};
-use types::timestamp::Timestamp;
 use anyhow::Result;
+use model::{Bundle, Food, UserSettings, Weight};
+use types::timestamp::Timestamp;
 
 pub struct StorageSqlite;
-
 
 impl StorageSqlite {
     pub fn new() -> Result<Self> {
@@ -49,7 +48,12 @@ impl Storage for StorageSqlite {
         todo!()
     }
 
-    fn get_weight_list(&self, user_id: i64, from: Timestamp, to: Timestamp) -> anyhow::Result<Vec<Weight>> {
+    fn get_weight_list(
+        &self,
+        user_id: i64,
+        from: Timestamp,
+        to: Timestamp,
+    ) -> anyhow::Result<Vec<Weight>> {
         todo!()
     }
 

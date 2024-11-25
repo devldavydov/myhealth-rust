@@ -148,8 +148,10 @@ name = "bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "log",
  "pretty_env_logger",
+ "service",
  "storage",
  "teloxide",
  "tokio",
@@ -944,6 +946,7 @@ dependencies = [
  "anyhow",
  "bot",
  "clap",
+ "service",
 ]
 
 [[package]]
@@ -1295,6 +1298,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
 ]
 
 [[package]]

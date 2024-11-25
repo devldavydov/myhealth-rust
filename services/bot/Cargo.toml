@@ -5,9 +5,11 @@ edition = "2021"
 
 [dependencies]
 storage = { workspace = true }
+service = { workspace = true }
 
 teloxide = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 pretty_env_logger = { workspace = true }
 tokio = { workspace = true }
+clap = { workspace = true }

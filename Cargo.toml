@@ -13,6 +13,7 @@ members = [
     "lib/model",
     "lib/storage",
     "lib/types",
+    "services/service",
     "services/bot"
 ]
 
@@ -20,6 +21,7 @@ members = [
 model = { path = "lib/model" }
 storage = { path = "lib/storage" }
 types = { path = "lib/types" }
+service = { path = "services/service" }
 bot = { path = "services/bot" }
 
 chrono = "0"
@@ -28,9 +30,11 @@ teloxide = { version = "0.13", default-features = false, features = ["macros", "
 log = "0.4"
 pretty_env_logger = "0.5"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
+clap = { version = "4", features = ["derive"] }
 
 [dependencies]
 bot = { workspace = true }
+service = { workspace = true }
 
 anyhow = { workspace = true }
-clap = { version = "4", features = ["derive"] }
+clap = { workspace = true }

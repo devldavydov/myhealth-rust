@@ -1,6 +1,6 @@
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use types::timestamp::Timestamp;
-use anyhow::{anyhow, Result};
 
 pub struct System {
     pub migration_id: u32,
@@ -39,27 +39,26 @@ pub struct Journal {
 }
 
 pub struct UserSettings {
-    pub cal_limit: f64
+    pub cal_limit: f64,
 }
 
 pub struct Bundle {
     pub key: String,
     // Map of bundle data
-	// Variants:
-	// if food: food_key -> weight > 0
-	// if bundle: bundle_key -> 0
-    pub data: HashMap<String, f64>
+    // Variants:
+    // if food: food_key -> weight > 0
+    // if bundle: bundle_key -> 0
+    pub data: HashMap<String, f64>,
 }
-
 
 impl Food {
     pub fn validate(&self) -> bool {
-        self.key != "" &&
-            self.name != "" &&
-            self.cal100 >= 0.0 && 
-            self.prot100 >= 0.0 &&
-            self.fat100 >= 0.0 &&
-            self.carb100 >= 0.0
+        self.key != ""
+            && self.name != ""
+            && self.cal100 >= 0.0
+            && self.prot100 >= 0.0
+            && self.fat100 >= 0.0
+            && self.carb100 >= 0.0
     }
 }
 
@@ -98,8 +97,7 @@ impl From<Meal> for String {
 
 impl Journal {
     pub fn validate(&self) -> bool {
-        self.food_key != "" &&
-            self.food_weight > 0.0
+        self.food_key != "" && self.food_weight > 0.0
     }
 }
 
