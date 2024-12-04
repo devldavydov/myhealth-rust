@@ -6,7 +6,7 @@ use teloxide::prelude::*;
 use super::args::ArgsCli;
 use super::cmd;
 use super::config::Config;
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 pub struct App {
     config: Config,
@@ -40,7 +40,9 @@ impl service::Service for App {
                 .endpoint(cmd::process_command),
         );
 
-        let stg: Arc<Box<dyn Storage>> = Arc::new(Box::new(StorageSqlite::new()?));
+        let stg: Arc<Box<dyn Storage>> = Arc::new(Box::new(
+            StorageSqlite::new().context("new sqlite storage")?,
+        ));
 
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()

@@ -2,10 +2,6 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use types::timestamp::Timestamp;
 
-pub struct System {
-    pub migration_id: u32,
-}
-
 pub struct Food {
     pub key: String,
     pub name: String,

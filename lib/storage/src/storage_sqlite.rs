@@ -2,15 +2,16 @@ use std::sync::Mutex;
 
 use crate::Storage;
 use anyhow::anyhow;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use model::{Bundle, Food, UserSettings, Weight};
 use rusqlite::Connection;
 use types::timestamp::Timestamp;
 
+mod functions;
 mod migrations;
 mod queries;
 
-use queries::CREATE_TABLE_SYSTEM;
+use functions::get_last_migration_id;
 
 const DB_FILE: &str = "myhealth.db";
 
@@ -42,12 +43,17 @@ impl Storage for StorageSqlite {
 
     fn apply_migrations(&self) -> Result<()> {
         let mut guard = self.conn.lock().unwrap();
-        let mut conn = guard.as_mut().unwrap();
+        let conn = guard.as_mut().unwrap();
 
         // Create system table if not exists
-        conn.execute(CREATE_TABLE_SYSTEM, ())?;
+        conn.execute_batch(queries::CREATE_TABLE_SYSTEM)
+            .context("create system table")?;
 
-        Ok(())
+        // TODO: set initial migration_id to 0 correctly.
+        // Now this value inserts after each start
+
+        let last_migration_id = get_last_migration_id(conn).context("get last migration id")?;
+        migrations::apply(conn, last_migration_id)
     }
 
     //
