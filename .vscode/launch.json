@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "bot",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=myhealth",
+                    "--package=myhealth"
+                ]
+            },
+            "args": [
+                "bot",
+                "-t",
+                "{TOKEN}",
+                "-a",
+                "{USERS_IDS}"
+            ],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
