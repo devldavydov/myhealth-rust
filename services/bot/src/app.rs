@@ -20,7 +20,10 @@ impl App {
     }
 
     fn filter_allowed_users(msg: Message, allowed_users_ids: Arc<Vec<u64>>) -> bool {
-        allowed_users_ids.contains(&msg.from.unwrap().id.0)
+        match msg.from {
+            Some(usr) => allowed_users_ids.contains(&usr.id.0),
+            _ => false,
+        }
     }
 }
 
@@ -45,12 +48,19 @@ impl service::Service for App {
             .unwrap()
             .block_on(async {
                 Dispatcher::builder(bot, handler)
-                    .dependencies(dptree::deps![stg, self.config.allowed_user_ids.clone()])
+                    .dependencies(dptree::deps![
+                        stg.clone(),
+                        self.config.allowed_user_ids.clone()
+                    ])
                     .enable_ctrlc_handler()
                     .build()
                     .dispatch()
                     .await;
             });
+
+        if let Err(err) = stg.close() {
+            log::error!("Storage close error: {:#?}", err);
+        }
 
         Ok(())
     }
