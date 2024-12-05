@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use storage::{storage_sqlite::StorageSqlite, Storage};
+use storage::{storage_sqlite::StorageSqlite, storage_sqlite::DB_FILE, Storage};
 use teloxide::prelude::*;
 
 use super::args::ArgsCli;
@@ -41,7 +41,7 @@ impl service::Service for App {
         );
 
         let stg: Arc<Box<dyn Storage>> = Arc::new(Box::new(
-            StorageSqlite::new().context("new sqlite storage")?,
+            StorageSqlite::new(DB_FILE.into()).context("new sqlite storage")?,
         ));
 
         tokio::runtime::Builder::new_multi_thread()
@@ -59,10 +59,6 @@ impl service::Service for App {
                     .dispatch()
                     .await;
             });
-
-        if let Err(err) = stg.close() {
-            log::error!("Storage close error: {:#?}", err);
-        }
 
         Ok(())
     }
