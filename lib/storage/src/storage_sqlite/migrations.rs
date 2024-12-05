@@ -1,5 +1,5 @@
 use super::{functions::update_migration_id, queries};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use rusqlite::{Connection, Transaction};
 
 type MigrationFn = fn(&Transaction) -> Result<()>;
@@ -32,17 +32,27 @@ fn get_all_migrations() -> Migrations {
 }
 
 fn insert_initial_migration_id(tx: &Transaction) -> Result<()> {
-    if let Err(err) = tx.execute(queries::INSERT_INITIAL_MIGRATION_ID, []) {
-        anyhow::bail!(err);
-    }
+    tx.execute(queries::INSERT_INITIAL_MIGRATION_ID, [])
+        .map_err(|e| anyhow!(e))?;
 
     Ok(())
 }
 
 fn create_tables(tx: &Transaction) -> Result<()> {
-    if let Err(err) = tx.execute(queries::CREATE_WEIGHT_TABLE, []) {
-        anyhow::bail!(err);
-    }
+    tx.execute(queries::CREATE_TABLE_WEIGHT, [])
+        .map_err(|e| anyhow!(e))?;
+    tx.execute(queries::CREATE_TABLE_FOOD, [])
+        .map_err(|e| anyhow!(e))?;
+    tx.execute(queries::CREATE_TABLE_JOURNAL, [])
+        .map_err(|e| anyhow!(e))?;
+    tx.execute(queries::CREATE_TABLE_BUNDLE, [])
+        .map_err(|e| anyhow!(e))?;
+    tx.execute(queries::CREATE_TABLE_BUNDLE_FOOD_ITEMS, [])
+        .map_err(|e| anyhow!(e))?;
+    tx.execute(queries::CREATE_TABLE_BUNDLE_BUNDLE_ITEMS, [])
+        .map_err(|e| anyhow!(e))?;
+    tx.execute(queries::CREATE_TABLE_USER_SETTINGS, [])
+        .map_err(|e| anyhow!(e))?;
 
     Ok(())
 }

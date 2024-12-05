@@ -16,11 +16,72 @@ pub const UPDATE_MIGRATION_ID: &str = "
     UPDATE system SET migration_id = ?1
 ";
 
-pub const CREATE_WEIGHT_TABLE: &str = "
+pub const CREATE_TABLE_WEIGHT: &str = "
     CREATE TABLE weight (
-        id        INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         user_id   INTEGER NOT NULL,
         timestamp INTEGER NOT NULL,
-        value     REAL    NOT NULL
-    );
+        value     REAL    NOT NULL,
+        PRIMARY KEY (user_id, timestamp)
+    )
+";
+
+pub const CREATE_TABLE_FOOD: &str = "
+    CREATE TABLE food (
+        key     TEXT NOT NULL PRIMARY KEY,
+        name    TEXT NOT NULL,
+        brand   TEXT NULL,
+        cal100  REAL NOT NULL,
+        prot100 REAL NOT NULL, 
+        fat100  REAL NOT NULL,
+        carb100 REAL NOT NULL,
+        comment TEXT NULL
+    )
+";
+
+pub const CREATE_TABLE_JOURNAL: &str = "
+    CREATE TABLE journal (
+        user_id    INTEGER NOT NULL,
+        timestamp  INTEGER NOT NULL,
+        meal       INTEGER NOT NULL,
+        foodkey    TEXT NOT NULL,
+        foodweight REAL NOT NULL,
+        PRIMARY KEY (user_id, timestamp, meal, foodkey),
+        FOREIGN KEY (foodkey) REFERENCES food(key) ON DELETE RESTRICT
+    )
+";
+
+pub const CREATE_TABLE_BUNDLE: &str = "
+    CREATE TABLE bundle (
+        user_id    INTEGER NOT NULL,
+        key        TEXT    NOT NULL,        
+        PRIMARY KEY (user_id, key)
+    )
+";
+
+pub const CREATE_TABLE_BUNDLE_FOOD_ITEMS: &str = "
+    CREATE TABLE bundle_food_items (
+        bundle_key  INTEGER NOT NULL,
+        food_key    INTEGER NOT NULL,
+        food_weight REAL    NOT NULL,
+        PRIMARY KEY (bundle_key, food_key),
+        FOREIGN KEY (bundle_key) REFERENCES bundle(key) ON DELETE RESTRICT,
+        FOREIGN KEY (food_key) REFERENCES food(key) ON DELETE RESTRICT
+    )
+";
+
+pub const CREATE_TABLE_BUNDLE_BUNDLE_ITEMS: &str = "
+    CREATE TABLE bundle_bundle_items (
+        bundle_key       INTEGER NOT NULL,
+        child_bundle_key INTEGER NOT NULL,
+        PRIMARY KEY (bundle_key, child_bundle_key),
+        FOREIGN KEY (bundle_key) REFERENCES bundle(key) ON DELETE RESTRICT,
+        FOREIGN KEY (child_bundle_key) REFERENCES bundle(key) ON DELETE RESTRICT
+    )
+";
+
+pub const CREATE_TABLE_USER_SETTINGS: &str = "
+    CREATE TABLE user_settings (
+        user_id   INTEGER NOT NULL PRIMARY KEY,
+        cal_limit REAL    NOT NULL
+    )
 ";
