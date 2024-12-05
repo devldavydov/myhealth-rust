@@ -1,8 +1,11 @@
 pub const CREATE_TABLE_SYSTEM: &str = "
     CREATE TABLE IF NOT EXISTS system (
         migration_id INTEGER
-    );
-    INSERT INTO system(migration_id) VALUES(0);
+    )    
+";
+
+pub const INSERT_INITIAL_MIGRATION_ID: &str = "
+    INSERT INTO system(migration_id) VALUES(0)
 ";
 
 pub const SELECT_MIGRATION_ID: &str = "

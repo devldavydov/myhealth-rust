@@ -28,10 +28,18 @@ pub fn apply(conn: &mut Connection, last_migration_id: i32) -> Result<()> {
 }
 
 fn get_all_migrations() -> Migrations {
-    vec![(1, create_initial_tables)]
+    vec![(1, insert_initial_migration_id), (2, create_tables)]
 }
 
-fn create_initial_tables(tx: &Transaction) -> Result<()> {
+fn insert_initial_migration_id(tx: &Transaction) -> Result<()> {
+    if let Err(err) = tx.execute(queries::INSERT_INITIAL_MIGRATION_ID, []) {
+        anyhow::bail!(err);
+    }
+
+    Ok(())
+}
+
+fn create_tables(tx: &Transaction) -> Result<()> {
     if let Err(err) = tx.execute(queries::CREATE_WEIGHT_TABLE, []) {
         anyhow::bail!(err);
     }

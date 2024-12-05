@@ -11,10 +11,10 @@ pub fn get_last_migration_id(conn: &mut Connection) -> Result<i32> {
         .context("quering current migration")?;
 
     if let Some(val) = rows.next() {
-        return val.context("get current migration value");
+        val.context("get current migration value")
+    } else {
+        Ok(0)
     }
-
-    anyhow::bail!("failed to get system migration_id");
 }
 
 pub fn update_migration_id(tx: &Transaction, migration_id: i32) -> Result<()> {

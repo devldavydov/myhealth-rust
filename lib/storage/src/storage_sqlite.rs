@@ -49,9 +49,6 @@ impl Storage for StorageSqlite {
         conn.execute_batch(queries::CREATE_TABLE_SYSTEM)
             .context("create system table")?;
 
-        // TODO: set initial migration_id to 0 correctly.
-        // Now this value inserts after each start
-
         let last_migration_id = get_last_migration_id(conn).context("get last migration id")?;
         migrations::apply(conn, last_migration_id)
     }
