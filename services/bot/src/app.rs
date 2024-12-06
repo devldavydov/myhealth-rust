@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use storage::{storage_sqlite::StorageSqlite, storage_sqlite::DB_FILE, Storage};
 use teloxide::prelude::*;
@@ -41,7 +41,7 @@ impl service::Service for App {
         );
 
         let stg: Arc<Box<dyn Storage>> = Arc::new(Box::new(
-            StorageSqlite::new(DB_FILE.into()).context("new sqlite storage")?,
+            StorageSqlite::new(Path::new(DB_FILE)).context("new sqlite storage")?,
         ));
 
         tokio::runtime::Builder::new_multi_thread()

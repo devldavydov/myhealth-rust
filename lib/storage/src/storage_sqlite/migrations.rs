@@ -1,11 +1,11 @@
-use super::{functions::update_migration_id, queries};
+use super::queries;
 use anyhow::{anyhow, Context, Result};
 use rusqlite::{Connection, Transaction};
 
 type MigrationFn = fn(&Transaction) -> Result<()>;
-type Migrations = Vec<(i32, MigrationFn)>;
+type Migrations = Vec<(i64, MigrationFn)>;
 
-pub fn apply(conn: &mut Connection, last_migration_id: i32) -> Result<()> {
+pub fn apply(conn: &mut Connection, last_migration_id: i64) -> Result<()> {
     for (id, f) in get_all_migrations() {
         if id <= last_migration_id {
             continue;
@@ -25,6 +25,13 @@ pub fn apply(conn: &mut Connection, last_migration_id: i32) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn update_migration_id(tx: &Transaction, migration_id: i64) -> Result<()> {
+    match tx.execute(queries::UPDATE_MIGRATION_ID, [migration_id]) {
+        Ok(_) => Ok(()),
+        Err(err) => Err(anyhow!(err)),
+    }
 }
 
 fn get_all_migrations() -> Migrations {

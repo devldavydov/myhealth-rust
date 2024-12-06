@@ -5,8 +5,6 @@ use types::timestamp::Timestamp;
 pub mod storage_sqlite;
 
 pub trait Storage: Send + Sync {
-    // System
-    fn apply_migrations(&self) -> Result<()>;
     // Food
     fn get_food(&self, key: &str) -> Result<Food>;
     fn get_food_list(&self) -> Result<Vec<Food>>;

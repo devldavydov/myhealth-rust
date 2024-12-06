@@ -1,17 +1,15 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::Path;
+use std::collections::HashMap;
 use std::sync::Mutex;
 
 use crate::Storage;
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use model::{Bundle, Food, UserSettings, Weight};
 use rusqlite::{types::Value, Connection, Params};
 use types::timestamp::Timestamp;
 
-mod functions;
 mod migrations;
 mod queries;
-
-use functions::get_last_migration_id;
 
 pub const DB_FILE: &str = "myhealth.db";
 
@@ -20,7 +18,7 @@ pub struct StorageSqlite {
 }
 
 impl StorageSqlite {
-    pub fn new(db_file: PathBuf) -> Result<Self> {
+    pub fn new(db_file: &Path) -> Result<Self> {
         let conn = Connection::open(format!(
             "file:{}?mode=rwc&_timeout=5000&_fk=1&_sync=1&_journal=wal",
             db_file.to_str().unwrap(),
@@ -30,9 +28,29 @@ impl StorageSqlite {
             conn: Mutex::new(Some(conn)),
         };
 
+        s.init()?;
         s.apply_migrations()?;
 
         Ok(s)
+    }
+
+    fn init(&self) -> Result<()> {
+        let mut guard = self.conn.lock().unwrap();
+        let conn = guard.as_mut().unwrap();
+
+        // Create system table if not exists
+        conn.execute_batch(queries::CREATE_TABLE_SYSTEM)
+            .context("create system table")?;
+
+        Ok(())
+    }
+
+    fn apply_migrations(&self) -> Result<()> {        
+        let last_migration_id = self.get_last_migration_id().context("get last migration id")?;
+
+        let mut guard = self.conn.lock().unwrap();
+        let conn = guard.as_mut().unwrap();
+        migrations::apply(conn, last_migration_id)
     }
 
     fn raw_query<P>(&self, query: &str, params: P) -> Result<Vec<HashMap<String, Value>>>
@@ -61,25 +79,23 @@ impl StorageSqlite {
 
         Ok(res)
     }
+
+    fn get_last_migration_id(&self) -> Result<i64> {
+        let res = self.raw_query(queries::SELECT_MIGRATION_ID, [])?;
+        if res.is_empty() {
+            return Ok(0);
+        }
+
+        let row = res.first().unwrap();
+        if let Some(Value::Integer(val)) = row.get("migration_id") {
+            return Ok(*val);
+        }
+
+        bail!("migration_id not found");
+    }
 }
 
 impl Storage for StorageSqlite {
-    //
-    // System
-    //
-
-    fn apply_migrations(&self) -> Result<()> {
-        let mut guard = self.conn.lock().unwrap();
-        let conn = guard.as_mut().unwrap();
-
-        // Create system table if not exists
-        conn.execute_batch(queries::CREATE_TABLE_SYSTEM)
-            .context("create system table")?;
-
-        let last_migration_id = get_last_migration_id(conn).context("get last migration id")?;
-        migrations::apply(conn, last_migration_id)
-    }
-
     //
     // Food
     //
@@ -167,11 +183,9 @@ mod test {
     #[test]
     fn test_migrations_apply() -> Result<()> {
         let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path().to_owned())?;
+        let stg = StorageSqlite::new(db_file.path())?;
 
-        let res = stg.raw_query("select migration_id from system", [])?;
-
-        assert_eq!(Value::Integer(2), *res.get(0).unwrap().get("migration_id").unwrap());
+        assert_eq!(2, stg.get_last_migration_id().unwrap());
 
         Ok(())
     }
