@@ -167,7 +167,24 @@ impl Storage for StorageSqlite {
 
         ensure!(!db_res.is_empty(), StorageError::EmptyList);
 
-        let res = Vec::with_capacity(db_res.len());
+        let mut res = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            let Some(Value::Integer(ts)) = row.get("timestamp") else {
+                bail!("failed to get \"timestamp\" field");
+            };
+            let Some(Value::Real(val)) = row.get("value") else {
+                bail!("failed to get \"valie\" field")
+            };
+
+            let Some(ts) = Timestamp::from_unix_millis(*ts) else {
+                bail!("failed to parse \"timestamp\" field");
+            };
+
+            res.push(Weight {
+                timestamp: ts,
+                value: *val,
+            });
+        }
 
         Ok(res)
     }

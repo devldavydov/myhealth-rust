@@ -40,6 +40,7 @@ pub const SELECT_WEIGHT_LIST: &str = "
         user_id = ?1 AND
         timestamp >= ?2 AND
         timestamp < ?3
+    ORDER BY timestamp DESC
 ";
 
 //
