@@ -62,15 +62,22 @@ impl StorageSqlite {
         let mut stmt = conn.prepare(query).context("prepare raw query")?;
         let mut rows = stmt.query(params).context("quering raw query")?;
 
+        let mut col_names: Vec<String> = Default::default();
+        let mut col_cnt: usize = Default::default();
+        let mut first = true;
+        
         let mut res = Vec::new();        
         while let Some(row) = rows.next().context("get next row")? {
-            let col_names = row.as_ref().column_names();
-            let col_cnt = col_names.len();
+            if first {
+                col_names = row.as_ref().column_names().iter().map(|&s| s.to_string()).collect();
+                col_cnt = col_names.len();
+                first = false;    
+            }
 
             let mut res_row = HashMap::with_capacity(col_cnt);
             for i in 0..col_cnt {
                 res_row.insert(
-                    (*col_names.get(i).unwrap()).into(),
+                    col_names.get(i).unwrap().clone(),
                     Value::from(row.get_ref(i).with_context(|| anyhow!(format!("get column {i}")))?)
                 );
             }
