@@ -1,11 +1,11 @@
-use std::path::Path;
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Mutex;
 
-use crate::Storage;
-use anyhow::{Context, Result, anyhow, bail};
+use crate::{Storage, StorageError};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use model::{Bundle, Food, UserSettings, Weight};
-use rusqlite::{types::Value, Connection, Params};
+use rusqlite::{params, types::Value, Connection, Params};
 use types::timestamp::Timestamp;
 
 mod migrations;
@@ -44,15 +44,18 @@ impl StorageSqlite {
         Ok(())
     }
 
-    fn apply_migrations(&self) -> Result<()> {        
-        let last_migration_id = self.get_last_migration_id().context("get last migration id")?;
+    fn apply_migrations(&self) -> Result<()> {
+        let last_migration_id = self
+            .get_last_migration_id()
+            .context("get last migration id")?;
 
         let mut conn = self.conn.lock().unwrap();
         migrations::apply(&mut conn, last_migration_id)
     }
 
     fn raw_query<P>(&self, query: &str, params: P) -> Result<Vec<HashMap<String, Value>>>
-    where P: Params
+    where
+        P: Params,
     {
         let conn = self.conn.lock().unwrap();
 
@@ -62,20 +65,28 @@ impl StorageSqlite {
         let mut col_names: Vec<String> = Default::default();
         let mut col_cnt: usize = Default::default();
         let mut first = true;
-        
-        let mut res = Vec::new();        
+
+        let mut res = Vec::new();
         while let Some(row) = rows.next().context("get next row")? {
             if first {
-                col_names = row.as_ref().column_names().iter().map(|&s| s.to_string()).collect();
+                col_names = row
+                    .as_ref()
+                    .column_names()
+                    .iter()
+                    .map(|&s| s.to_string())
+                    .collect();
                 col_cnt = col_names.len();
-                first = false;    
+                first = false;
             }
 
             let mut res_row = HashMap::with_capacity(col_cnt);
             for i in 0..col_cnt {
                 res_row.insert(
                     col_names.get(i).unwrap().clone(),
-                    Value::from(row.get_ref(i).with_context(|| anyhow!(format!("get column {i}")))?)
+                    Value::from(
+                        row.get_ref(i)
+                            .with_context(|| anyhow!(format!("get column {i}")))?,
+                    ),
                 );
             }
             res.push(res_row);
@@ -85,7 +96,7 @@ impl StorageSqlite {
     }
 
     fn get_last_migration_id(&self) -> Result<i64> {
-        let res = self.raw_query(queries::SELECT_MIGRATION_ID, [])?;
+        let res = self.raw_query(queries::SELECT_MIGRATION_ID, params![])?;
         if res.is_empty() {
             return Ok(0);
         }
@@ -148,13 +159,17 @@ impl Storage for StorageSqlite {
     // Weight
     //
 
-    fn get_weight_list(
-        &self,
-        user_id: i64,
-        from: Timestamp,
-        to: Timestamp,
-    ) -> anyhow::Result<Vec<Weight>> {
-        todo!()
+    fn get_weight_list(&self, user_id: i64, from: Timestamp, to: Timestamp) -> Result<Vec<Weight>> {
+        let db_res = self.raw_query(
+            queries::SELECT_WEIGHT_LIST,
+            params![user_id, from.millisecond(), to.millisecond()],
+        )?;
+
+        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+
+        let res = Vec::with_capacity(db_res.len());
+
+        Ok(res)
     }
 
     fn set_weight(&self, user_id: i64, weight: &Weight) -> Result<()> {
@@ -181,7 +196,7 @@ impl Storage for StorageSqlite {
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::Result;
+    use anyhow::{anyhow, Result};
     use tempfile::NamedTempFile;
 
     #[test]
@@ -190,6 +205,27 @@ mod test {
         let stg = StorageSqlite::new(db_file.path())?;
 
         assert_eq!(2, stg.get_last_migration_id().unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_weight_list() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Check EmptyList error
+        let res = stg.get_weight_list(
+            1,
+            Timestamp::from_unix_millis(0).unwrap(),
+            Timestamp::from_unix_millis(10).unwrap(),
+        );
+
+        let err = res.unwrap_err();
+        assert_eq!(
+            StorageError::EmptyList,
+            *err.root_cause().downcast_ref::<StorageError>().unwrap()
+        );
 
         Ok(())
     }

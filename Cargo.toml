@@ -33,6 +33,7 @@ tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 clap = { version = "4", features = ["derive"] }
 rusqlite = { version = "0.32.0", features = ["bundled"] }
 tempfile = "3"
+thiserror = "2"
 
 [dependencies]
 bot = { workspace = true }

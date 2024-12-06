@@ -13,6 +13,7 @@ pub struct Food {
     pub comment: String,
 }
 
+#[derive(Debug)]
 pub struct Weight {
     pub timestamp: Timestamp,
     pub value: f64,

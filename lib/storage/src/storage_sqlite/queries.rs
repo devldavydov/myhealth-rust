@@ -1,3 +1,7 @@
+//
+// System
+//
+
 pub const CREATE_TABLE_SYSTEM: &str = "
     CREATE TABLE IF NOT EXISTS system (
         migration_id INTEGER
@@ -16,6 +20,10 @@ pub const UPDATE_MIGRATION_ID: &str = "
     UPDATE system SET migration_id = ?1
 ";
 
+//
+// Weight
+//
+
 pub const CREATE_TABLE_WEIGHT: &str = "
     CREATE TABLE weight (
         user_id   INTEGER NOT NULL,
@@ -24,6 +32,19 @@ pub const CREATE_TABLE_WEIGHT: &str = "
         PRIMARY KEY (user_id, timestamp)
     )
 ";
+
+pub const SELECT_WEIGHT_LIST: &str = "
+    SELECT timestamp, value
+    FROM weight
+    WHERE
+        user_id = ?1 AND
+        timestamp >= ?2 AND
+        timestamp < ?3
+";
+
+//
+// Food
+//
 
 pub const CREATE_TABLE_FOOD: &str = "
     CREATE TABLE food (
@@ -38,6 +59,10 @@ pub const CREATE_TABLE_FOOD: &str = "
     )
 ";
 
+//
+// Journal
+//
+
 pub const CREATE_TABLE_JOURNAL: &str = "
     CREATE TABLE journal (
         user_id    INTEGER NOT NULL,
@@ -49,6 +74,10 @@ pub const CREATE_TABLE_JOURNAL: &str = "
         FOREIGN KEY (foodkey) REFERENCES food(key) ON DELETE RESTRICT
     )
 ";
+
+//
+// Bundle
+//
 
 pub const CREATE_TABLE_BUNDLE: &str = "
     CREATE TABLE bundle (
@@ -78,6 +107,10 @@ pub const CREATE_TABLE_BUNDLE_BUNDLE_ITEMS: &str = "
         FOREIGN KEY (child_bundle_key) REFERENCES bundle(key) ON DELETE RESTRICT
     )
 ";
+
+//
+// User settings
+//
 
 pub const CREATE_TABLE_USER_SETTINGS: &str = "
     CREATE TABLE user_settings (

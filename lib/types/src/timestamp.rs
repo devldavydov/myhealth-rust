@@ -1,5 +1,6 @@
 use chrono::{DateTime, FixedOffset, Utc};
 
+#[derive(Debug)]
 pub struct Timestamp(DateTime<FixedOffset>);
 
 impl Timestamp {
@@ -9,6 +10,10 @@ impl Timestamp {
 
     pub fn from_unix_millis(v: i64) -> Option<Self> {
         DateTime::from_timestamp_millis(v).map(|v| v.fixed_offset().into())
+    }
+
+    pub fn millisecond(&self) -> i64 {
+        self.0.timestamp_subsec_millis() as i64
     }
 }
 

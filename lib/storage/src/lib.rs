@@ -1,5 +1,6 @@
 use anyhow::Result;
 use model::{Bundle, Food, UserSettings, Weight};
+use thiserror::Error;
 use types::timestamp::Timestamp;
 
 pub mod storage_sqlite;
@@ -24,4 +25,12 @@ pub trait Storage: Send + Sync {
     // UserSettings
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings>;
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()>;
+}
+
+#[derive(Error, Debug, PartialEq)]
+pub enum StorageError {
+    #[error("not found")]
+    NotFound,
+    #[error("empty list")]
+    EmptyList,
 }
