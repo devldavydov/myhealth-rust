@@ -14,7 +14,7 @@ mod queries;
 pub const DB_FILE: &str = "myhealth.db";
 
 pub struct StorageSqlite {
-    conn: Mutex<Option<Connection>>,
+    conn: Mutex<Connection>,
 }
 
 impl StorageSqlite {
@@ -25,7 +25,7 @@ impl StorageSqlite {
         ))?;
 
         let s = Self {
-            conn: Mutex::new(Some(conn)),
+            conn: Mutex::new(conn),
         };
 
         s.init()?;
@@ -35,8 +35,7 @@ impl StorageSqlite {
     }
 
     fn init(&self) -> Result<()> {
-        let mut guard = self.conn.lock().unwrap();
-        let conn = guard.as_mut().unwrap();
+        let conn = self.conn.lock().unwrap();
 
         // Create system table if not exists
         conn.execute_batch(queries::CREATE_TABLE_SYSTEM)
@@ -48,16 +47,14 @@ impl StorageSqlite {
     fn apply_migrations(&self) -> Result<()> {        
         let last_migration_id = self.get_last_migration_id().context("get last migration id")?;
 
-        let mut guard = self.conn.lock().unwrap();
-        let conn = guard.as_mut().unwrap();
-        migrations::apply(conn, last_migration_id)
+        let mut conn = self.conn.lock().unwrap();
+        migrations::apply(&mut conn, last_migration_id)
     }
 
     fn raw_query<P>(&self, query: &str, params: P) -> Result<Vec<HashMap<String, Value>>>
     where P: Params
     {
-        let mut guard = self.conn.lock().unwrap();
-        let conn = guard.as_mut().unwrap();
+        let conn = self.conn.lock().unwrap();
 
         let mut stmt = conn.prepare(query).context("prepare raw query")?;
         let mut rows = stmt.query(params).context("quering raw query")?;
