@@ -108,6 +108,26 @@ impl StorageSqlite {
 
         bail!("migration_id not found");
     }
+
+    fn get_timestamp(row: &HashMap<String, Value>, field: &str) -> Result<Timestamp> {
+        let Some(Value::Integer(ts)) = row.get(field) else {
+            bail!("failed to get \"{field}\" field");
+        };
+
+        let Some(ts) = Timestamp::from_unix_millis(*ts) else {
+            bail!("failed to parse \"{field}\" field");
+        };
+
+        Ok(ts)
+    }
+
+    fn get_float(row: &HashMap<String, Value>, field: &str) -> Result<f64> {
+        let Some(Value::Real(val)) = row.get(field) else {
+            bail!("failed to get \"{field}\" field")
+        };
+
+        Ok(*val)
+    }
 }
 
 impl Storage for StorageSqlite {
@@ -168,21 +188,10 @@ impl Storage for StorageSqlite {
         ensure!(!db_res.is_empty(), StorageError::EmptyList);
 
         let mut res = Vec::with_capacity(db_res.len());
-        for row in db_res {
-            let Some(Value::Integer(ts)) = row.get("timestamp") else {
-                bail!("failed to get \"timestamp\" field");
-            };
-            let Some(Value::Real(val)) = row.get("value") else {
-                bail!("failed to get \"valie\" field")
-            };
-
-            let Some(ts) = Timestamp::from_unix_millis(*ts) else {
-                bail!("failed to parse \"timestamp\" field");
-            };
-
+        for row in &db_res {
             res.push(Weight {
-                timestamp: ts,
-                value: *val,
+                timestamp: Self::get_timestamp(row, "timestamp")?,
+                value: Self::get_float(row, "value")?,
             });
         }
 
@@ -213,7 +222,7 @@ impl Storage for StorageSqlite {
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::{anyhow, Result};
+    use anyhow::Result;
     use tempfile::NamedTempFile;
 
     #[test]
