@@ -1,6 +1,6 @@
 use chrono::{DateTime, FixedOffset, Utc};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Timestamp(DateTime<FixedOffset>);
 
 impl Timestamp {
