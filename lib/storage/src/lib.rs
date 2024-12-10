@@ -27,8 +27,11 @@ pub trait Storage: Send + Sync {
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()>;
 }
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Default)]
 pub enum StorageError {
+    #[error("unknown")]
+    #[default]
+    Unknown,
     #[error("not found")]
     NotFound,
     #[error("empty list")]

@@ -43,6 +43,20 @@ pub const SELECT_WEIGHT_LIST: &str = "
     ORDER BY timestamp DESC
 ";
 
+pub const DELETE_WEIGHT: &str = "
+    DELETE FROM weight
+    WHERE
+        user_id = ?1 AND
+        timestamp = ?2
+";
+
+pub const UPSERT_WEIGHT: &str = "
+    INSERT INTO weight (user_id, timestamp, value)
+    VALUES (?1, ?2, ?3)
+    ON CONFLICT (user_id, timestamp) DO
+    UPDATE SET value = ?3
+";
+
 //
 // Food
 //

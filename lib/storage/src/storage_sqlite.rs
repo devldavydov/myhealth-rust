@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use crate::{Storage, StorageError};
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Error, Result};
 use model::{Bundle, Food, UserSettings, Weight};
 use rusqlite::{params, types::Value, Connection, Params};
 use types::timestamp::Timestamp;
@@ -32,6 +32,14 @@ impl StorageSqlite {
         s.apply_migrations()?;
 
         Ok(s)
+    }
+
+    pub fn is_storage_error(&self, stg_err: StorageError, err: &Error) -> bool {
+        stg_err
+            == *err
+                .root_cause()
+                .downcast_ref::<StorageError>()
+                .unwrap_or(&StorageError::default())
     }
 
     fn init(&self) -> Result<()> {
@@ -208,11 +216,19 @@ impl Storage for StorageSqlite {
     }
 
     fn set_weight(&self, user_id: i64, weight: &Weight) -> Result<()> {
-        todo!()
+        self.raw_execute(
+            queries::UPSERT_WEIGHT,
+            false,
+            params![user_id, weight.timestamp.millisecond(), weight.value],
+        )
     }
 
     fn delete_weight(&self, user_id: i64, timestamp: Timestamp) -> Result<()> {
-        todo!()
+        self.raw_execute(
+            queries::DELETE_WEIGHT,
+            false,
+            params![user_id, timestamp.millisecond()],
+        )
     }
 
     //
@@ -256,11 +272,7 @@ mod test {
             Timestamp::from_unix_millis(10).unwrap(),
         );
 
-        let err = res.unwrap_err();
-        assert_eq!(
-            StorageError::EmptyList,
-            *err.root_cause().downcast_ref::<StorageError>().unwrap()
-        );
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
 
         // Add test data
         stg.raw_execute(
@@ -308,14 +320,106 @@ mod test {
             Timestamp::from_unix_millis(10).unwrap(),
         );
         assert_eq!(
-            vec![
-                Weight {
-                    timestamp: Timestamp::from_unix_millis(4).unwrap(),
-                    value: 4.4
-                },               
-            ],
+            vec![Weight {
+                timestamp: Timestamp::from_unix_millis(4).unwrap(),
+                value: 4.4
+            },],
             res.unwrap()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete_weight() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Add test data
+        stg.raw_execute(
+            "
+            INSERT INTO weight(user_id, timestamp, value)
+            VALUES 
+                (1, 1, 1.1),
+                (2, 4, 4.4)
+            ;
+        ",
+            false,
+            params![],
+        )?;
+
+        // Delete for user 2
+        stg.delete_weight(2, Timestamp::from_unix_millis(4).unwrap())?;
+        let res = stg.get_weight_list(
+            2,
+            Timestamp::from_unix_millis(0).unwrap(),
+            Timestamp::from_unix_millis(10).unwrap(),
+        );
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        // Delete for user 1, that not exists
+        stg.delete_weight(1, Timestamp::from_unix_millis(4).unwrap())?;
+        assert_eq!(
+            1,
+            stg.get_weight_list(
+                1,
+                Timestamp::from_unix_millis(0).unwrap(),
+                Timestamp::from_unix_millis(10).unwrap(),
+            )?
+            .len()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_weight() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set weight
+        stg.set_weight(
+            1,
+            &Weight {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                value: 1.1,
+            },
+        )?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            "SELECT timestamp, value FROM weight WHERE user_id = 1",
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            Value::Integer(1),
+            *res.get(0).unwrap().get("timestamp").unwrap()
+        );
+        assert_eq!(Value::Real(1.1), *res.get(0).unwrap().get("value").unwrap());
+
+        // Update weight
+        stg.set_weight(
+            1,
+            &Weight {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                value: 2.2,
+            },
+        )?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            "SELECT timestamp, value FROM weight WHERE user_id = 1",
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            Value::Integer(1),
+            *res.get(0).unwrap().get("timestamp").unwrap()
+        );
+        assert_eq!(Value::Real(2.2), *res.get(0).unwrap().get("value").unwrap());
 
         Ok(())
     }
