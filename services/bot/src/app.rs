@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc, thread};
+use std::{path::Path, sync::Arc};
 
 use storage::{storage_sqlite::StorageSqlite, storage_sqlite::DB_FILE, Storage};
 use teloxide::prelude::*;
@@ -46,8 +46,6 @@ impl service::Service for App {
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .worker_threads(1)
-            .max_blocking_threads(thread::available_parallelism().unwrap().get())
             .build()?;
 
         runtime.block_on(async {

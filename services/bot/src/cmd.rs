@@ -8,10 +8,14 @@ use super::messages;
 use std::sync::Arc;
 use storage::Storage;
 use teloxide::prelude::*;
+use types::timestamp::Timestamp;
 
 use crate::HandlerResult;
 
 pub async fn process_command(bot: Bot, msg: Message, stg: Arc<Box<dyn Storage>>) -> HandlerResult {
+    // Get user_id (unwrap - because we filtered message before and there should be a user)
+    let user_id = msg.from.clone().unwrap().id.0;
+
     match msg.text() {
         None => {
             bot.send_message(msg.chat.id, messages::ERR_WRONG_COMMAND)
@@ -52,8 +56,14 @@ pub async fn process_command(bot: Bot, msg: Message, stg: Arc<Box<dyn Storage>>)
                         .await?;
                     }
                     "w" => {
-                        weight::process_weight_command(bot, msg.chat.id, parts[1..].to_vec(), stg)
-                            .await?;
+                        weight::process_weight_command(
+                            bot,
+                            user_id,
+                            msg.chat.id,
+                            parts[1..].to_vec(),
+                            stg,
+                        )
+                        .await?;
                     }
                     _ => {
                         bot.send_message(msg.chat.id, messages::ERR_WRONG_COMMAND)
@@ -65,4 +75,12 @@ pub async fn process_command(bot: Bot, msg: Message, stg: Arc<Box<dyn Storage>>)
     };
 
     Ok(())
+}
+
+pub fn parse_timestamp(input: &str) -> anyhow::Result<Timestamp> {
+    if input.is_empty() {
+        Ok(Timestamp::now())
+    } else {
+        Timestamp::parse(input, "%d.%m.%Y")
+    }
 }

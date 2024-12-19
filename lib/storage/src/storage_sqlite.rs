@@ -215,7 +215,7 @@ impl Storage for StorageSqlite {
         Ok(res)
     }
 
-    fn set_weight(&self, user_id: i64, weight: &Weight) -> Result<()> {
+    fn set_weight(&self, user_id: u64, weight: &Weight) -> Result<()> {
         self.raw_execute(
             queries::UPSERT_WEIGHT,
             false,

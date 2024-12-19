@@ -25,6 +25,7 @@ service = { path = "services/service" }
 bot = { path = "services/bot" }
 
 chrono = "0"
+chrono-tz = "0"
 anyhow = "1"
 teloxide = { version = "0.13", default-features = false, features = ["macros", "rustls", "ctrlc_handler"] }
 log = "0.4"
