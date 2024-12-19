@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, thread};
 
 use storage::{storage_sqlite::StorageSqlite, storage_sqlite::DB_FILE, Storage};
 use teloxide::prelude::*;
@@ -44,22 +44,24 @@ impl service::Service for App {
             StorageSqlite::new(Path::new(DB_FILE)).context("new sqlite storage")?,
         ));
 
-        tokio::runtime::Builder::new_multi_thread()
+        let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .build()
-            .unwrap()
-            .block_on(async {
-                Dispatcher::builder(bot, handler)
-                    .dependencies(dptree::deps![
-                        stg.clone(),
-                        self.config.allowed_user_ids.clone()
-                    ])
-                    .enable_ctrlc_handler()
-                    .build()
-                    .dispatch()
-                    .await;
-            });
+            .worker_threads(1)
+            .max_blocking_threads(thread::available_parallelism().unwrap().get())
+            .build()?;
 
-        Ok(())
+        runtime.block_on(async {
+            Dispatcher::builder(bot, handler)
+                .dependencies(dptree::deps![
+                    stg.clone(),
+                    self.config.allowed_user_ids.clone()
+                ])
+                .enable_ctrlc_handler()
+                .build()
+                .dispatch()
+                .await;
+
+            Ok(())
+        })
     }
 }
