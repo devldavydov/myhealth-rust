@@ -16,10 +16,13 @@
                 "bot",
                 "-t",
                 "{TOKEN}",
-                "-a",
-                "{USERS_IDS}"
+                "-u",
+                "{USER_ID}"
             ],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "DEBUG",
+            },
         }
     ]
 }

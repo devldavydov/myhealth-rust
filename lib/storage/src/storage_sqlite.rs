@@ -199,7 +199,7 @@ impl Storage for StorageSqlite {
     fn get_weight_list(&self, user_id: i64, from: Timestamp, to: Timestamp) -> Result<Vec<Weight>> {
         let db_res = self.raw_query(
             queries::SELECT_WEIGHT_LIST,
-            params![user_id, from.millisecond(), to.millisecond()],
+            params![user_id, from.unix_millis(), to.unix_millis()],
         )?;
 
         ensure!(!db_res.is_empty(), StorageError::EmptyList);
@@ -219,7 +219,7 @@ impl Storage for StorageSqlite {
         self.raw_execute(
             queries::UPSERT_WEIGHT,
             false,
-            params![user_id, weight.timestamp.millisecond(), weight.value],
+            params![user_id, weight.timestamp.unix_millis(), weight.value],
         )
     }
 
@@ -227,7 +227,7 @@ impl Storage for StorageSqlite {
         self.raw_execute(
             queries::DELETE_WEIGHT,
             false,
-            params![user_id, timestamp.millisecond()],
+            params![user_id, timestamp.unix_millis()],
         )
     }
 
@@ -381,7 +381,7 @@ mod test {
         stg.set_weight(
             1,
             &Weight {
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                timestamp: Timestamp::from_unix_millis(1734876557).unwrap(),
                 value: 1.1,
             },
         )?;
@@ -394,7 +394,7 @@ mod test {
 
         assert_eq!(1, res.len());
         assert_eq!(
-            Value::Integer(1),
+            Value::Integer(1734876557),
             *res.get(0).unwrap().get("timestamp").unwrap()
         );
         assert_eq!(Value::Real(1.1), *res.get(0).unwrap().get("value").unwrap());
@@ -403,7 +403,7 @@ mod test {
         stg.set_weight(
             1,
             &Weight {
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                timestamp: Timestamp::from_unix_millis(1734876557).unwrap(),
                 value: 2.2,
             },
         )?;
@@ -416,7 +416,7 @@ mod test {
 
         assert_eq!(1, res.len());
         assert_eq!(
-            Value::Integer(1),
+            Value::Integer(1734876557),
             *res.get(0).unwrap().get("timestamp").unwrap()
         );
         assert_eq!(Value::Real(2.2), *res.get(0).unwrap().get("value").unwrap());
