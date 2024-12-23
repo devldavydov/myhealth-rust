@@ -31,6 +31,7 @@ pub async fn process_command(
             let parts: Vec<&str> = input.split(",").collect();
 
             if parts.is_empty() {
+                log::error!("empty command");
                 bot.send_message(msg.chat.id, messages::ERR_WRONG_COMMAND)
                     .await?;
             } else {
@@ -73,6 +74,7 @@ pub async fn process_command(
                         .await?;
                     }
                     _ => {
+                        log::error!("unknown command");
                         bot.send_message(msg.chat.id, messages::ERR_WRONG_COMMAND)
                             .await?;
                     }

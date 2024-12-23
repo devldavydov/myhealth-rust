@@ -20,6 +20,7 @@ pub async fn process_weight_command(
     tz: Tz,
 ) -> HandlerResult {
     if args.is_empty() {
+        log::error!("empty args");
         bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
         return Ok(());
     }
@@ -35,6 +36,7 @@ pub async fn process_weight_command(
             weight_list(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
         }
         _ => {
+            log::error!("unknown command");
             bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
         }
     };
@@ -51,6 +53,7 @@ async fn weight_set(
     tz: Tz,
 ) -> HandlerResult {
     if args.len() != 2 {
+        log::error!("wrong args count");
         bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
         return Ok(());
     }
@@ -59,7 +62,7 @@ async fn weight_set(
     let timestamp = match parse_timestamp(args.first().unwrap(), tz) {
         Ok(v) => v,
         Err(err) => {
-            log::error!("parse timestamp error: {}", err);
+            log::error!("parse timestamp error: {err}");
             bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
             return Ok(());
         }
@@ -67,7 +70,8 @@ async fn weight_set(
 
     let value = match args.get(1).unwrap().parse::<f64>() {
         Ok(v) => v,
-        Err(_) => {
+        Err(err) => {
+            log::error!("parse timestamp error: {err}");
             bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
             return Ok(());
         }
@@ -76,13 +80,14 @@ async fn weight_set(
     // Validate weight
     let w = Weight { timestamp, value };
     if !w.validate() {
-        log::error!("invalid weight value");
+        log::error!("invalid weight value: {:#?}", w);
         bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
         return Ok(());
     }
 
     // Call storage
-    if let Err(_) = stg.set_weight(user_id, &w) {
+    if let Err(err) = stg.set_weight(user_id, &w) {
+        log::error!("set weight error: {err}");
         bot.send_message(chat_id, ERR_INTERNAL).await?;
     } else {
         bot.send_message(chat_id, OK).await?;
