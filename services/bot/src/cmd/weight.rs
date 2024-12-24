@@ -13,7 +13,7 @@ use super::parse_timestamp;
 
 pub async fn process_weight_command(
     bot: Bot,
-    user_id: u64,
+    user_id: i64,
     chat_id: ChatId,
     args: Vec<&str>,
     stg: Arc<Box<dyn Storage>>,
@@ -46,7 +46,7 @@ pub async fn process_weight_command(
 
 async fn weight_set(
     bot: Bot,
-    user_id: u64,
+    user_id: i64,
     chat_id: ChatId,
     args: Vec<&str>,
     stg: Arc<Box<dyn Storage>>,
@@ -98,18 +98,42 @@ async fn weight_set(
 
 async fn weight_del(
     bot: Bot,
-    user_id: u64,
+    user_id: i64,
     chat_id: ChatId,
     args: Vec<&str>,
     stg: Arc<Box<dyn Storage>>,
     tz: Tz,
 ) -> HandlerResult {
+    if args.len() != 1 {
+        log::error!("wrong args count");
+        bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+        return Ok(());
+    }
+
+    // Parse args
+    let timestamp = match parse_timestamp(args.first().unwrap(), tz) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("parse timestamp error: {err}");
+            bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+            return Ok(());
+        }
+    };
+
+    // Call storage
+    if let Err(err) = stg.delete_weight(user_id, timestamp) {
+        log::error!("delete weight error: {err}");
+        bot.send_message(chat_id, ERR_INTERNAL).await?;
+    } else {
+        bot.send_message(chat_id, OK).await?;
+    }
+
     Ok(())
 }
 
 async fn weight_list(
     bot: Bot,
-    user_id: u64,
+    user_id: i64,
     chat_id: ChatId,
     args: Vec<&str>,
     stg: Arc<Box<dyn Storage>>,

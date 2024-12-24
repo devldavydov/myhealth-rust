@@ -20,7 +20,7 @@ pub async fn process_command(
     tz: Tz,
 ) -> HandlerResult {
     // Get user_id (unwrap - because we filtered message before and there should be a user)
-    let user_id = msg.from.clone().unwrap().id.0;
+    let user_id = msg.from.clone().unwrap().id.0 as i64;
 
     match msg.text() {
         None => {
@@ -28,7 +28,7 @@ pub async fn process_command(
                 .await?;
         }
         Some(input) => {
-            let parts: Vec<&str> = input.split(",").collect();
+            let parts: Vec<&str> = input.split(",").into_iter().map(|v| v.trim()).collect();
 
             if parts.is_empty() {
                 log::error!("empty command");

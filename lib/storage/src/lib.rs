@@ -19,7 +19,7 @@ pub trait Storage: Send + Sync {
     fn delete_bundle(&self, user_id: i64, key: &str) -> Result<()>;
     // Weight
     fn get_weight_list(&self, user_id: i64, from: Timestamp, to: Timestamp) -> Result<Vec<Weight>>;
-    fn set_weight(&self, user_id: u64, weight: &Weight) -> Result<()>;
+    fn set_weight(&self, user_id: i64, weight: &Weight) -> Result<()>;
     fn delete_weight(&self, user_id: i64, timestamp: Timestamp) -> Result<()>;
     // Journal
     // UserSettings
