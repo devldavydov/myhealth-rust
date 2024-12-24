@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 
 use chrono::{DateTime, FixedOffset, NaiveDateTime, NaiveTime, TimeZone, Utc};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Timestamp(DateTime<FixedOffset>);
 
 impl Timestamp {

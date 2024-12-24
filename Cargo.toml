@@ -15,12 +15,13 @@ members = [
     "lib/types",
     "services/service",
     "services/bot"
-]
+, "lib/html"]
 
 [workspace.dependencies]
 model = { path = "lib/model" }
 storage = { path = "lib/storage" }
 types = { path = "lib/types" }
+html = { path = "lib/html" }
 service = { path = "services/service" }
 bot = { path = "services/bot" }
 

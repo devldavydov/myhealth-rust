@@ -1,11 +1,11 @@
 use chrono_tz::Tz;
 use model::Weight;
 use std::sync::Arc;
-use storage::Storage;
-use teloxide::prelude::*;
+use storage::{Storage, StorageError};
+use teloxide::{prelude::*, types::InputFile};
 
 use crate::{
-    messages::{ERR_INTERNAL, ERR_WRONG_COMMAND, OK},
+    messages::{ERR_EMPTY, ERR_INTERNAL, ERR_WRONG_COMMAND, OK},
     HandlerResult,
 };
 
@@ -139,5 +139,57 @@ async fn weight_list(
     stg: Arc<Box<dyn Storage>>,
     tz: Tz,
 ) -> HandlerResult {
+    if args.len() != 2 {
+        log::error!("wrong args count");
+        bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+        return Ok(());
+    }
+
+    // Parse args
+    let tsFrom = match parse_timestamp(args.first().unwrap(), tz) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("parse timestamp from error: {err}");
+            bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+            return Ok(());
+        }
+    };
+
+    let tsTo = match parse_timestamp(args.get(1).unwrap(), tz) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("parse timestamp to error: {err}");
+            bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+            return Ok(());
+        }
+    };
+
+    // Call storage
+    let w_lst = match stg.get_weight_list(user_id, tsFrom.clone(), tsTo.clone()) {
+        Err(err) => {
+            log::error!("delete weight error: {err}");
+            if stg.is_storage_error(StorageError::EmptyList, &err) {
+                bot.send_message(chat_id, ERR_EMPTY).await?;
+            } else {
+                bot.send_message(chat_id, ERR_INTERNAL).await?;
+            }
+            return Ok(());
+        }
+        Ok(lst) => lst,
+    };
+
+    // Generate HTML
+    let doc = html::get_html();
+
+    bot.send_document(
+        chat_id,
+        InputFile::memory(doc).file_name(format!(
+            "weight_{}_{}.html",
+            tsFrom.format("%d.%m.%Y"),
+            tsTo.format("%d.%m.%Y")
+        )),
+    )
+    .await?;
+
     Ok(())
 }

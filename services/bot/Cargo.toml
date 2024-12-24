@@ -8,6 +8,7 @@ storage = { workspace = true }
 model = { workspace = true }
 service = { workspace = true }
 types = { workspace = true }
+html = { workspace = true }
 
 teloxide = { workspace = true }
 anyhow = { workspace = true }

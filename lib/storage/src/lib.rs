@@ -25,6 +25,8 @@ pub trait Storage: Send + Sync {
     // UserSettings
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings>;
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()>;
+    // Error
+    fn is_storage_error(&self, stg_err: StorageError, err: &anyhow::Error) -> bool;
 }
 
 #[derive(Error, Debug, PartialEq, Default)]

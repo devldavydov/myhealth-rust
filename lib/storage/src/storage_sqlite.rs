@@ -34,14 +34,6 @@ impl StorageSqlite {
         Ok(s)
     }
 
-    pub fn is_storage_error(&self, stg_err: StorageError, err: &Error) -> bool {
-        stg_err
-            == *err
-                .root_cause()
-                .downcast_ref::<StorageError>()
-                .unwrap_or(&StorageError::default())
-    }
-
     fn init(&self) -> Result<()> {
         // Create system table if not exists
         self.raw_execute(queries::CREATE_TABLE_SYSTEM, false, params![])
@@ -241,6 +233,18 @@ impl Storage for StorageSqlite {
 
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()> {
         todo!()
+    }
+
+    //
+    // Error
+    //
+
+    fn is_storage_error(&self, stg_err: StorageError, err: &Error) -> bool {
+        stg_err
+            == *err
+                .root_cause()
+                .downcast_ref::<StorageError>()
+                .unwrap_or(&StorageError::default())
     }
 }
 
