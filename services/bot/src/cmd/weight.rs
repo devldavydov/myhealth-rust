@@ -179,11 +179,11 @@ async fn weight_list(
     };
 
     // Generate HTML
-    let doc = html::get_html();
+    let doc = html::Builder::new("Таблица веса");
 
     bot.send_document(
         chat_id,
-        InputFile::memory(doc).file_name(format!(
+        InputFile::memory(doc.build()).file_name(format!(
             "weight_{}_{}.html",
             tsFrom.format("%d.%m.%Y"),
             tsTo.format("%d.%m.%Y")
