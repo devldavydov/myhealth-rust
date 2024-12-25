@@ -5,12 +5,12 @@ pub struct S {
 }
 
 impl S {
-    pub fn new(val: &str) -> Self {
-        Self { val: val.into() }
+    pub fn create(val: &str) -> Box<dyn Element> {
+        Box::new(Self { val: val.into() })
     }
 
-    pub fn new_nbsp() -> Self {
-        S::new("&nbsp;")
+    pub fn create_nbsp() -> Box<dyn Element> {
+        S::create("&nbsp;")
     }
 }
 

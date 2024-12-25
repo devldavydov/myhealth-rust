@@ -28,7 +28,7 @@ pub async fn process_command(
                 .await?;
         }
         Some(input) => {
-            let parts: Vec<&str> = input.split(",").into_iter().map(|v| v.trim()).collect();
+            let parts: Vec<&str> = input.split(",").map(|v| v.trim()).collect();
 
             if parts.is_empty() {
                 log::error!("empty command");

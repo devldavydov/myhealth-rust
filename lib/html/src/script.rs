@@ -5,8 +5,8 @@ pub struct Script {
 }
 
 impl Script {
-    pub fn new(url: &str) -> Self {
-        Self { url: url.into() }
+    pub fn create(url: &str) -> Box<dyn Element> {
+        Box::new(Self { url: url.into() })
     }
 }
 

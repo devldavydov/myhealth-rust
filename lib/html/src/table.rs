@@ -15,39 +15,36 @@ impl Table {
         }
     }
 
-    pub fn add_row(mut self, row: Tr) -> Self {
+    pub fn add_row(&mut self, row: Tr) {
         self.rows.push(row);
-        self
     }
 
-    pub fn add_footer_element(mut self, elem: Box<dyn Element>) -> Self {
+    pub fn add_footer_element(&mut self, elem: Box<dyn Element>) {
         self.footer.push(elem);
-        self
     }
 }
 
 impl Element for Table {
     fn build(&self) -> String {
         // Header
-        let mut table = format!(
-            r#"
+        let mut table = r#"
         <table class="table table-bordered table-hover">
 		    <thead class="table-light">
 			    <tr>
         "#
-        );
+        .to_string();
 
         for h in &self.header {
             table.push_str(&format!("<th>{}</th>", h));
         }
 
-        table.push_str(&format!(
+        table.push_str(
             r#"
                 </tr>
 		    </thead>
 		    <tbody>
-        "#
-        ));
+        "#,
+        );
 
         // Rows
         for r in &self.rows {
@@ -97,11 +94,16 @@ pub struct Tr {
 }
 
 impl Tr {
-    pub fn new(attrs: Attrs) -> Self {
+    pub fn new() -> Self {
         Self {
             items: Vec::default(),
-            attrs,
+            attrs: Attrs::default(),
         }
+    }
+
+    pub fn set_attrs(mut self, attrs: Attrs) -> Self {
+        self.attrs = attrs;
+        self
     }
 
     pub fn add_td(mut self, td: Td) -> Self {
@@ -110,9 +112,15 @@ impl Tr {
     }
 }
 
+impl Default for Tr {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Element for Tr {
     fn build(&self) -> String {
-        let mut tr = format!("< tr {}>", self.attrs);
+        let mut tr = format!("<tr {}>", self.attrs);
 
         for item in &self.items {
             tr.push_str(&item.build());
@@ -134,8 +142,16 @@ pub struct Td {
 }
 
 impl Td {
-    pub fn new(val: Box<dyn Element>, attrs: Attrs) -> Self {
-        Self { val, attrs }
+    pub fn new(val: Box<dyn Element>) -> Self {
+        Self {
+            val,
+            attrs: Attrs::default(),
+        }
+    }
+
+    pub fn set_attrs(mut self, attrs: Attrs) -> Self {
+        self.attrs = attrs;
+        self
     }
 }
 

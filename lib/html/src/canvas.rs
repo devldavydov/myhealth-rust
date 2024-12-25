@@ -5,8 +5,8 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new(id: &str) -> Self {
-        Self { id: id.into() }
+    pub fn create(id: &str) -> Box<dyn Element> {
+        Box::new(Self { id: id.into() })
     }
 }
 

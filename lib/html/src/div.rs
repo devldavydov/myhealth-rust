@@ -17,7 +17,7 @@ impl Div {
         Div::new("container")
     }
 
-    pub fn add(mut self, element: Box<dyn Element>) -> Self {
+    pub fn add_element(mut self, element: Box<dyn Element>) -> Self {
         self.elements.push(element);
         self
     }

@@ -1,11 +1,12 @@
 use core::fmt;
 use std::collections::HashMap;
 
+#[derive(Default)]
 pub struct Attrs(HashMap<String, String>);
 
 impl Attrs {
-    pub fn new(attrs: HashMap<String, String>) -> Self {
-        Self(attrs)
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn insert(&mut self, k: &str, v: &str) {

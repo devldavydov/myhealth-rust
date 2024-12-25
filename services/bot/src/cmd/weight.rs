@@ -1,4 +1,12 @@
 use chrono_tz::Tz;
+use html::accordion::{Accordion, AccordionItem};
+use html::canvas::Canvas;
+use html::div::Div;
+use html::s::S;
+use html::script::Script;
+use html::table::Table;
+use html::table::{Td, Tr};
+use html::{JS_BOOTSTRAP_URL, JS_CHART_URL};
 use model::Weight;
 use std::sync::Arc;
 use storage::{Storage, StorageError};
@@ -146,7 +154,7 @@ async fn weight_list(
     }
 
     // Parse args
-    let tsFrom = match parse_timestamp(args.first().unwrap(), tz) {
+    let ts_from = match parse_timestamp(args.first().unwrap(), tz) {
         Ok(v) => v,
         Err(err) => {
             log::error!("parse timestamp from error: {err}");
@@ -155,7 +163,7 @@ async fn weight_list(
         }
     };
 
-    let tsTo = match parse_timestamp(args.get(1).unwrap(), tz) {
+    let ts_to = match parse_timestamp(args.get(1).unwrap(), tz) {
         Ok(v) => v,
         Err(err) => {
             log::error!("parse timestamp to error: {err}");
@@ -165,7 +173,7 @@ async fn weight_list(
     };
 
     // Call storage
-    let w_lst = match stg.get_weight_list(user_id, tsFrom.clone(), tsTo.clone()) {
+    let w_lst = match stg.get_weight_list(user_id, ts_from.clone(), ts_to.clone()) {
         Err(err) => {
             log::error!("delete weight error: {err}");
             if stg.is_storage_error(StorageError::EmptyList, &err) {
@@ -179,15 +187,50 @@ async fn weight_list(
     };
 
     // Generate HTML
-    let doc = html::Builder::new("Таблица веса");
+    let ts_from = ts_from.format("%d.%m.%Y");
+    let ts_to = ts_to.format("%d.%m.%Y");
+
+    let mut doc = html::Builder::new("Таблица веса");
+    let mut accrd = Accordion::new("accordionWeight");
+
+    // Table
+    let mut tbl = Table::new(vec!["Дата".into(), "Вес".into()]);
+
+    let mut x_labels = Vec::with_capacity(w_lst.len());
+    let mut data = Vec::with_capacity(w_lst.len());
+
+    for w in &w_lst {
+        tbl.add_row(
+            Tr::new()
+                .add_td(Td::new(S::create(&w.timestamp.format("%d.%m.%Y"))))
+                .add_td(Td::new(S::create(&format!("{:.1}", w.value)))),
+        );
+        x_labels.push(w.timestamp.format("%d.%m.%Y"));
+        data.push(w.value);
+    }
+
+    accrd.add_item(AccordionItem::new(
+        "tbl",
+        &format!("Таблица веса за {} - {}", &ts_from, &ts_to),
+        Box::new(tbl),
+    ));
+
+    // Chart
+    accrd.add_item(AccordionItem::new(
+        "graph",
+        &format!("График веса за {} - {}", &ts_from, &ts_to),
+        Canvas::create("chart"),
+    ));
+
+    // Doc
+    doc = doc
+        .add_element(Box::new(Div::new_container().add_element(Box::new(accrd))))
+        .add_element(Script::create(JS_BOOTSTRAP_URL))
+        .add_element(Script::create(JS_CHART_URL));
 
     bot.send_document(
         chat_id,
-        InputFile::memory(doc.build()).file_name(format!(
-            "weight_{}_{}.html",
-            tsFrom.format("%d.%m.%Y"),
-            tsTo.format("%d.%m.%Y")
-        )),
+        InputFile::memory(doc.build()).file_name(format!("weight_{}_{}.html", &ts_from, &ts_to)),
     )
     .await?;
 

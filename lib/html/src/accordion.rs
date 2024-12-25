@@ -13,10 +13,9 @@ impl Accordion {
         }
     }
 
-    fn add_item(mut self, mut item: AccordionItem) -> Self {
+    pub fn add_item(&mut self, mut item: AccordionItem) {
         item.set_accordion_id(&self.id);
         self.items.push(item);
-        self
     }
 }
 
