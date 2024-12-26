@@ -9,6 +9,9 @@ pub struct ArgsCli {
     #[arg(short = 'u', required = true, help = "Allowed User IDs to use bot")]
     pub allowed_user_ids: Vec<u64>,
 
+    #[arg(short = 'd', required = true, help = "DB file path")]
+    pub db_file_path: String,
+
     #[arg(short = 'z', default_value = "Europe/Moscow", help = "Timezone")]
     pub tz: String,
 }

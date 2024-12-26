@@ -4,14 +4,12 @@ use std::sync::Mutex;
 
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
-use model::{Bundle, Food, UserSettings, Weight};
+use model::{backup::Backup, Bundle, Food, UserSettings, Weight};
 use rusqlite::{params, types::Value, Connection, Params};
 use types::timestamp::Timestamp;
 
 mod migrations;
 mod queries;
-
-pub const DB_FILE: &str = "myhealth.db";
 
 pub struct StorageSqlite {
     conn: Mutex<Connection>,
@@ -243,6 +241,23 @@ impl Storage for StorageSqlite {
 
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()> {
         todo!()
+    }
+
+    //
+    // Backup/Restore
+    //
+
+    fn restore(&self, backup: &Backup) -> Result<()> {
+        for w in &backup.weight {
+            self.raw_execute(
+                queries::UPSERT_WEIGHT,
+                false,
+                params![w.user_id, w.timestamp, w.value],
+            )
+            .context("upsert backup weight query")?;
+        }
+
+        Ok(())
     }
 
     //

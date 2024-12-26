@@ -2,6 +2,8 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use types::timestamp::Timestamp;
 
+pub mod backup;
+
 pub struct Food {
     pub key: String,
     pub name: String,
