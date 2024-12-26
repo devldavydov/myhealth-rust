@@ -70,7 +70,7 @@ impl service::Service for App {
     fn run(&mut self) -> Result<()> {
         self.init_logging();
 
-        log::info!("Starting MyHealth bot...");
+        log::info!("starting MyHealth bot...");
 
         let bot = Bot::new(self.config.token.clone());
 
@@ -89,6 +89,7 @@ impl service::Service for App {
         ));
 
         if let Some(backup) = self.try_get_backup().context("try get backup")? {
+            log::info!("found backup, restoring...");
             stg.restore(&backup).context("storage backup")?;
         }
 
