@@ -68,5 +68,7 @@ pub fn get_chart_snippet(data: ChartData) -> Result<String> {
     .context("add template error")?;
     let tmpl = env.get_template("chart").context("get template error")?;
 
-    tmpl.render(context!(data => data)).map_err(|e| anyhow!(e))
+    tmpl.render(context!(data => data))
+        .map_err(|e| anyhow!(e))
+        .context("render template error")
 }

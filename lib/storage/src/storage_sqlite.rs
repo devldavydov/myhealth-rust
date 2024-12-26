@@ -22,14 +22,15 @@ impl StorageSqlite {
         let conn = Connection::open(format!(
             "file:{}?mode=rwc&_timeout=5000&_fk=1&_sync=1&_journal=wal",
             db_file.to_str().unwrap(),
-        ))?;
+        ))
+        .context("open db connection")?;
 
         let s = Self {
             conn: Mutex::new(conn),
         };
 
-        s.init()?;
-        s.apply_migrations()?;
+        s.init().context("storage init")?;
+        s.apply_migrations().context("storage apply migrations")?;
 
         Ok(s)
     }
@@ -37,6 +38,7 @@ impl StorageSqlite {
     fn init(&self) -> Result<()> {
         // Create system table if not exists
         self.raw_execute(queries::CREATE_TABLE_SYSTEM, false, params![])
+            .context("exec create system table")
     }
 
     fn apply_migrations(&self) -> Result<()> {
@@ -45,7 +47,7 @@ impl StorageSqlite {
             .context("get last migration id")?;
 
         let mut conn = self.conn.lock().unwrap();
-        migrations::apply(&mut conn, last_migration_id)
+        migrations::apply(&mut conn, last_migration_id).context("apply list of migrations")
     }
 
     fn raw_query<P>(&self, query: &str, params: P) -> Result<Vec<HashMap<String, Value>>>
@@ -98,14 +100,17 @@ impl StorageSqlite {
         if !batch {
             conn.execute(query, params).context("raw execute query")?;
         } else {
-            conn.execute_batch(query).context("raw execute query")?;
+            conn.execute_batch(query)
+                .context("raw execute batch query")?;
         }
 
         Ok(())
     }
 
     fn get_last_migration_id(&self) -> Result<i64> {
-        let res = self.raw_query(queries::SELECT_MIGRATION_ID, params![])?;
+        let res = self
+            .raw_query(queries::SELECT_MIGRATION_ID, params![])
+            .context("query last migration")?;
         if res.is_empty() {
             return Ok(0);
         }
@@ -189,18 +194,21 @@ impl Storage for StorageSqlite {
     //
 
     fn get_weight_list(&self, user_id: i64, from: Timestamp, to: Timestamp) -> Result<Vec<Weight>> {
-        let db_res = self.raw_query(
-            queries::SELECT_WEIGHT_LIST,
-            params![user_id, from.unix_millis(), to.unix_millis()],
-        )?;
+        let db_res = self
+            .raw_query(
+                queries::SELECT_WEIGHT_LIST,
+                params![user_id, from.unix_millis(), to.unix_millis()],
+            )
+            .context("weight list query")?;
 
         ensure!(!db_res.is_empty(), StorageError::EmptyList);
 
         let mut res = Vec::with_capacity(db_res.len());
         for row in &db_res {
             res.push(Weight {
-                timestamp: Self::get_timestamp(row, "timestamp")?,
-                value: Self::get_float(row, "value")?,
+                timestamp: Self::get_timestamp(row, "timestamp")
+                    .context("weight timestamp field")?,
+                value: Self::get_float(row, "value").context("weight value field")?,
             });
         }
 
@@ -213,6 +221,7 @@ impl Storage for StorageSqlite {
             false,
             params![user_id, weight.timestamp.unix_millis(), weight.value],
         )
+        .context("upsert weight query")
     }
 
     fn delete_weight(&self, user_id: i64, timestamp: Timestamp) -> Result<()> {
@@ -221,6 +230,7 @@ impl Storage for StorageSqlite {
             false,
             params![user_id, timestamp.unix_millis()],
         )
+        .context("delete weight query")
     }
 
     //

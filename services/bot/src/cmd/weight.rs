@@ -176,7 +176,7 @@ async fn weight_list(
     // Call storage
     let w_lst = match stg.get_weight_list(user_id, ts_from.clone(), ts_to.clone()) {
         Err(err) => {
-            log::error!("delete weight error: {err}");
+            log::error!("weight list error: {err}");
             if stg.is_storage_error(StorageError::EmptyList, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
@@ -203,7 +203,11 @@ async fn weight_list(
     for w in &w_lst {
         tbl.add_row(
             Tr::new()
-                .add_td(Td::new(S::create( &format_timestamp(&w.timestamp, "%d.%m.%Y", tz))))
+                .add_td(Td::new(S::create(&format_timestamp(
+                    &w.timestamp,
+                    "%d.%m.%Y",
+                    tz,
+                ))))
                 .add_td(Td::new(S::create(&format!("{:.1}", w.value)))),
         );
         x_labels.push(format_timestamp(&w.timestamp, "%d.%m.%Y", tz));

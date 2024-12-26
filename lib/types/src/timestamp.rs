@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 
 use chrono::{DateTime, FixedOffset, NaiveDateTime, NaiveTime, TimeZone, Utc};
 
@@ -18,7 +18,8 @@ impl Timestamp {
         let dt = NaiveDateTime::parse_from_str(
             &format!("{input}T00:00:00"),
             &format!("{format}T%H:%M:%S"),
-        )?;
+        )
+        .context("parse naive datetime")?;
         tz.from_local_datetime(&dt)
             .single()
             .ok_or(anyhow!("bad date"))

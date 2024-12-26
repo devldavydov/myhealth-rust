@@ -65,11 +65,12 @@ impl service::Service for App {
             StorageSqlite::new(Path::new(DB_FILE)).context("new sqlite storage")?,
         ));
 
-        let tz: Tz = self.config.tz.parse()?;
+        let tz: Tz = self.config.tz.parse().context("tz parse")?;
 
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
-            .build()?;
+            .build()
+            .context("build tokio runtime")?;
 
         runtime.block_on(async {
             Dispatcher::builder(bot, handler)

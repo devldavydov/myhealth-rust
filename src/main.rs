@@ -1,8 +1,8 @@
 mod cli;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
     let mut service = cli::parse();
-    service.run()
+    service.run().context("main service run")
 }
