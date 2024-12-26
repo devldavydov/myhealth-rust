@@ -166,6 +166,7 @@ name = "bot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chart",
  "chrono",
  "chrono-tz",
  "clap",
@@ -206,6 +207,15 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
+name = "chart"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "minijinja",
+ "serde",
+]
 
 [[package]]
 name = "chrono"
@@ -1019,6 +1029,15 @@ checksum = "f7c44f8e672c00fe5308fa235f821cb4198414e1c77935c1ab6948d3fd78550e"
 dependencies = [
  "mime",
  "unicase",
+]
+
+[[package]]
+name = "minijinja"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c37e1b517d1dcd0e51dc36c4567b9d5a29262b3ec8da6cb5d35e27a8fb529b5"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

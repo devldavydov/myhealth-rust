@@ -9,6 +9,7 @@ model = { workspace = true }
 service = { workspace = true }
 types = { workspace = true }
 html = { workspace = true }
+chart = { workspace = true }
 
 teloxide = { workspace = true }
 anyhow = { workspace = true }

@@ -1,3 +1,4 @@
+use chart::{get_chart_snippet, ChartData, ChartDataset, CHART_COLOR_BLUE};
 use chrono_tz::Tz;
 use html::accordion::{Accordion, AccordionItem};
 use html::canvas::Canvas;
@@ -17,7 +18,7 @@ use crate::{
     HandlerResult,
 };
 
-use super::parse_timestamp;
+use super::{format_timestamp, parse_timestamp};
 
 pub async fn process_weight_command(
     bot: Bot,
@@ -187,8 +188,8 @@ async fn weight_list(
     };
 
     // Generate HTML
-    let ts_from = ts_from.format("%d.%m.%Y");
-    let ts_to = ts_to.format("%d.%m.%Y");
+    let ts_from = format_timestamp(&ts_from, "%d.%m.%Y", tz);
+    let ts_to = format_timestamp(&ts_to, "%d.%m.%Y", tz);
 
     let mut doc = html::Builder::new("Таблица веса");
     let mut accrd = Accordion::new("accordionWeight");
@@ -202,10 +203,10 @@ async fn weight_list(
     for w in &w_lst {
         tbl.add_row(
             Tr::new()
-                .add_td(Td::new(S::create(&w.timestamp.format("%d.%m.%Y"))))
+                .add_td(Td::new(S::create( &format_timestamp(&w.timestamp, "%d.%m.%Y", tz))))
                 .add_td(Td::new(S::create(&format!("{:.1}", w.value)))),
         );
-        x_labels.push(w.timestamp.format("%d.%m.%Y"));
+        x_labels.push(format_timestamp(&w.timestamp, "%d.%m.%Y", tz));
         data.push(w.value);
     }
 
@@ -222,11 +223,30 @@ async fn weight_list(
         Canvas::create("chart"),
     ));
 
+    let chart_snip = match get_chart_snippet(ChartData {
+        elem_id: "chart".into(),
+        x_labels: x_labels,
+        ctype: "line".into(),
+        datasets: vec![ChartDataset {
+            data: data,
+            label: "Вес".into(),
+            color: CHART_COLOR_BLUE.into(),
+        }],
+    }) {
+        Err(err) => {
+            log::error!("chart snippet error: {err}");
+            bot.send_message(chat_id, ERR_INTERNAL).await?;
+            return Ok(());
+        }
+        Ok(snip) => snip,
+    };
+
     // Doc
     doc = doc
         .add_element(Box::new(Div::new_container().add_element(Box::new(accrd))))
         .add_element(Script::create(JS_BOOTSTRAP_URL))
-        .add_element(Script::create(JS_CHART_URL));
+        .add_element(Script::create(JS_CHART_URL))
+        .add_element(S::create(&chart_snip));
 
     bot.send_document(
         chat_id,

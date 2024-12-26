@@ -15,13 +15,14 @@ members = [
     "lib/types",
     "services/service",
     "services/bot"
-, "lib/html"]
+, "lib/html", "lib/chart"]
 
 [workspace.dependencies]
 model = { path = "lib/model" }
 storage = { path = "lib/storage" }
 types = { path = "lib/types" }
 html = { path = "lib/html" }
+chart = { path = "lib/chart" }
 service = { path = "services/service" }
 bot = { path = "services/bot" }
 
@@ -36,6 +37,8 @@ clap = { version = "4", features = ["derive"] }
 rusqlite = { version = "0.32.0", features = ["bundled"] }
 tempfile = "3"
 thiserror = "2"
+minijinja = "2"
+serde = "1"
 
 [dependencies]
 bot = { workspace = true }

@@ -93,3 +93,7 @@ pub fn parse_timestamp(input: &str, tz: Tz) -> anyhow::Result<Timestamp> {
         Timestamp::parse_date(input, "%d.%m.%Y", tz)
     }
 }
+
+pub fn format_timestamp(ts: &Timestamp, format: &str, tz: Tz) -> String {
+    ts.with_timezone(tz).format(format)
+}
