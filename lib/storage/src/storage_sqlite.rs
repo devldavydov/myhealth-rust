@@ -302,16 +302,16 @@ mod test {
         assert_eq!(
             vec![
                 Weight {
-                    timestamp: Timestamp::from_unix_millis(3).unwrap(),
-                    value: 3.3
+                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                    value: 1.1
                 },
                 Weight {
                     timestamp: Timestamp::from_unix_millis(2).unwrap(),
                     value: 2.2
                 },
                 Weight {
-                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                    value: 1.1
+                    timestamp: Timestamp::from_unix_millis(3).unwrap(),
+                    value: 3.3
                 },
             ],
             res.unwrap()
