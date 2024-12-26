@@ -14,10 +14,10 @@
             },
             "args": [
                 "bot",
-                "-t",
-                "{TOKEN}",
-                "-u",
-                "{USER_ID}"
+                "-t", "TOKEN",
+                "-u", "USER_ID",
+                "-d", "./myhealth.db",
+                "-b"
             ],
             "cwd": "${workspaceFolder}",
             "env": {

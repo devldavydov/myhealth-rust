@@ -229,10 +229,10 @@ async fn weight_list(
 
     let chart_snip = match get_chart_snippet(ChartData {
         elem_id: "chart".into(),
-        x_labels: x_labels,
+        x_labels,
         ctype: "line".into(),
         datasets: vec![ChartDataset {
-            data: data,
+            data,
             label: "Вес".into(),
             color: CHART_COLOR_BLUE.into(),
         }],

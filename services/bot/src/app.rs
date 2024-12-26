@@ -104,7 +104,8 @@ impl service::Service for App {
                 .dependencies(dptree::deps![
                     stg.clone(),
                     self.config.allowed_user_ids.clone(),
-                    tz
+                    tz,
+                    self.config.debug
                 ])
                 .enable_ctrlc_handler()
                 .build()

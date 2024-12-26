@@ -14,4 +14,8 @@ pub struct ArgsCli {
 
     #[arg(short = 'z', default_value = "Europe/Moscow", help = "Timezone")]
     pub tz: String,
+
+    #[arg(short = 'b', action, help = "Debug mode")]
+    pub debug: bool,
+
 }

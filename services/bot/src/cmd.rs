@@ -18,9 +18,15 @@ pub async fn process_command(
     msg: Message,
     stg: Arc<Box<dyn Storage>>,
     tz: Tz,
+    debug: bool,
 ) -> HandlerResult {
     // Get user_id (unwrap - because we filtered message before and there should be a user)
     let user_id = msg.from.clone().unwrap().id.0 as i64;
+
+    if debug {
+        bot.send_message(msg.chat.id, messages::DEBUG_MODE)
+                .await?;
+    }
 
     match msg.text() {
         None => {

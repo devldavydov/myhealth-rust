@@ -7,6 +7,7 @@ pub struct Config {
     pub allowed_user_ids: Arc<Vec<u64>>,
     pub db_file_path: String,
     pub tz: String,
+    pub debug: bool,
 }
 
 impl Config {
@@ -16,6 +17,7 @@ impl Config {
             allowed_user_ids: Arc::new(args.allowed_user_ids),
             db_file_path: args.db_file_path,
             tz: args.tz,
+            debug: args.debug
         }
     }
 }
