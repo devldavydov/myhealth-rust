@@ -39,6 +39,8 @@ tempfile = "3"
 thiserror = "2"
 minijinja = "2"
 serde = "1"
+serde_json = "1"
+flate2 = "1"
 
 [dependencies]
 bot = { workspace = true }
