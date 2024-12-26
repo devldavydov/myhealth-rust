@@ -1,0 +1,1 @@
+1. Storage tests not work from VSCODE: serde error, but works from the whole workspace via test.sh

@@ -277,7 +277,12 @@ impl Storage for StorageSqlite {
 mod test {
     use super::*;
     use anyhow::Result;
+    use model::backup::WeightBackup;
     use tempfile::NamedTempFile;
+
+    //
+    // Migrations
+    //
 
     #[test]
     fn test_migrations_apply() -> Result<()> {
@@ -288,6 +293,10 @@ mod test {
 
         Ok(())
     }
+
+    //
+    // Weight
+    //
 
     #[test]
     fn test_get_weight_list() -> Result<()> {
@@ -449,6 +458,68 @@ mod test {
             *res.get(0).unwrap().get("timestamp").unwrap()
         );
         assert_eq!(Value::Real(2.2), *res.get(0).unwrap().get("value").unwrap());
+
+        Ok(())
+    }
+
+
+    //
+    // Restore/backup
+    //
+
+    #[test]
+    fn test_restore() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Do restore
+        stg.restore(&Backup{
+            timestamp: 1,
+            weight: vec![
+                WeightBackup{timestamp: 1, user_id: 1, value: 1.1},
+                WeightBackup{timestamp: 2, user_id: 1, value: 2.2},
+                WeightBackup{timestamp: 3, user_id: 1, value: 3.3},
+                WeightBackup{timestamp: 4, user_id: 2, value: 4.4},
+            ]
+        })?;
+
+        // Check weight list for user 1
+        let res = stg.get_weight_list(
+            1,
+            Timestamp::from_unix_millis(0).unwrap(),
+            Timestamp::from_unix_millis(10).unwrap(),
+        );
+        assert_eq!(
+            vec![
+                Weight {
+                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                    value: 1.1
+                },
+                Weight {
+                    timestamp: Timestamp::from_unix_millis(2).unwrap(),
+                    value: 2.2
+                },
+                Weight {
+                    timestamp: Timestamp::from_unix_millis(3).unwrap(),
+                    value: 3.3
+                },
+            ],
+            res.unwrap()
+        );
+
+        // Check weight list for user 2
+        let res = stg.get_weight_list(
+            2,
+            Timestamp::from_unix_millis(0).unwrap(),
+            Timestamp::from_unix_millis(10).unwrap(),
+        );
+        assert_eq!(
+            vec![Weight {
+                timestamp: Timestamp::from_unix_millis(4).unwrap(),
+                value: 4.4
+            },],
+            res.unwrap()
+        );
 
         Ok(())
     }
