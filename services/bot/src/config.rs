@@ -17,7 +17,7 @@ impl Config {
             allowed_user_ids: Arc::new(args.allowed_user_ids),
             db_file_path: args.db_file_path,
             tz: args.tz,
-            debug: args.debug
+            debug: args.debug,
         }
     }
 }

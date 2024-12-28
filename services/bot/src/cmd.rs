@@ -24,8 +24,7 @@ pub async fn process_command(
     let user_id = msg.from.clone().unwrap().id.0 as i64;
 
     if debug {
-        bot.send_message(msg.chat.id, messages::DEBUG_MODE)
-                .await?;
+        bot.send_message(msg.chat.id, messages::DEBUG_MODE).await?;
     }
 
     match msg.text() {

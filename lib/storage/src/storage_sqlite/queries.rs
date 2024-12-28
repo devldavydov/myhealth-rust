@@ -73,6 +73,19 @@ pub const CREATE_TABLE_FOOD: &str = "
     )
 ";
 
+pub const UPSERT_FOOD: &str = "
+    INSERT INTO food (
+        key, name, brand, cal100,
+        prot100, fat100, carb100, comment
+    )
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+    ON CONFLICT (key) DO
+    UPDATE SET
+        name = ?2, brand = ?3, cal100 = ?4,
+        prot100 = ?5, fat100 = ?6, carb100 = ?7,
+        comment = ?8
+";
+
 //
 // Journal
 //

@@ -17,5 +17,4 @@ pub struct ArgsCli {
 
     #[arg(short = 'b', action, help = "Debug mode")]
     pub debug: bool,
-
 }

@@ -140,6 +140,14 @@ impl StorageSqlite {
 
         Ok(*val)
     }
+
+    fn get_string(row: &HashMap<String, Value>, field: &str) -> Result<String> {
+        let Some(Value::Text(val)) = row.get(field) else {
+            bail!("failed to get \"{field}\" field")
+        };
+
+        Ok(val.clone())
+    }
 }
 
 impl Storage for StorageSqlite {
@@ -156,7 +164,23 @@ impl Storage for StorageSqlite {
     }
 
     fn set_food(&self, food: &Food) -> Result<()> {
-        todo!()
+        ensure!(food.validate(), StorageError::InvalidFood);
+
+        self.raw_execute(
+            queries::UPSERT_FOOD,
+            false,
+            params![
+                food.key,
+                food.name,
+                food.brand,
+                food.cal100,
+                food.prot100,
+                food.fat100,
+                food.carb100,
+                food.comment
+            ],
+        )
+        .context("upsert weight query")
     }
 
     fn find_food(&self, pattern: String) -> Result<Vec<Food>> {
@@ -214,6 +238,8 @@ impl Storage for StorageSqlite {
     }
 
     fn set_weight(&self, user_id: i64, weight: &Weight) -> Result<()> {
+        ensure!(weight.validate(), StorageError::InvalidWeight);
+
         self.raw_execute(
             queries::UPSERT_WEIGHT,
             false,
@@ -395,7 +421,7 @@ mod test {
         );
         assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
 
-        // Delete for user 1, that not exists
+        // Delete for user 1 record that not exists (timestamp=4)
         stg.delete_weight(1, Timestamp::from_unix_millis(4).unwrap())?;
         assert_eq!(
             1,
@@ -415,6 +441,16 @@ mod test {
         let db_file = NamedTempFile::new()?;
         let stg = StorageSqlite::new(db_file.path())?;
 
+        // Set invalid weight
+        let res = stg.set_weight(
+            1,
+            &Weight {
+                timestamp: Timestamp::from_unix_millis(1734876557).unwrap(),
+                value: -1.1,
+            },
+        );
+        assert!(stg.is_storage_error(StorageError::InvalidWeight, &res.unwrap_err()));
+
         // Set weight
         stg.set_weight(
             1,
@@ -432,10 +468,13 @@ mod test {
 
         assert_eq!(1, res.len());
         assert_eq!(
-            Value::Integer(1734876557),
-            *res.get(0).unwrap().get("timestamp").unwrap()
+            Timestamp::from_unix_millis(1734876557).unwrap(),
+            StorageSqlite::get_timestamp(res.get(0).unwrap(), "timestamp").unwrap()
         );
-        assert_eq!(Value::Real(1.1), *res.get(0).unwrap().get("value").unwrap());
+        assert_eq!(
+            1.1,
+            StorageSqlite::get_float(res.get(0).unwrap(), "value").unwrap()
+        );
 
         // Update weight
         stg.set_weight(
@@ -454,14 +493,155 @@ mod test {
 
         assert_eq!(1, res.len());
         assert_eq!(
-            Value::Integer(1734876557),
-            *res.get(0).unwrap().get("timestamp").unwrap()
+            Timestamp::from_unix_millis(1734876557).unwrap(),
+            StorageSqlite::get_timestamp(res.get(0).unwrap(), "timestamp").unwrap()
         );
-        assert_eq!(Value::Real(2.2), *res.get(0).unwrap().get("value").unwrap());
+        assert_eq!(
+            2.2,
+            StorageSqlite::get_float(res.get(0).unwrap(), "value").unwrap()
+        );
 
         Ok(())
     }
 
+    //
+    // Food
+    //
+
+    #[test]
+    fn test_set_food() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set invalid food
+        let res = stg.set_food(&Food {
+            key: "".into(),
+            name: "name".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        });
+        assert!(stg.is_storage_error(StorageError::InvalidFood, &res.unwrap_err()));
+
+        // Set food
+        stg.set_food(&Food {
+            key: "key".into(),
+            name: "name".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        })?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT
+                key, name, brand, cal100,
+                prot100, fat100, carb100, comment
+            FROM food
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            String::from("key"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+        );
+        assert_eq!(
+            String::from("name"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+        );
+        assert_eq!(
+            String::from("brand"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "brand").unwrap()
+        );
+        assert_eq!(
+            1.1,
+            StorageSqlite::get_float(res.get(0).unwrap(), "cal100").unwrap()
+        );
+        assert_eq!(
+            2.2,
+            StorageSqlite::get_float(res.get(0).unwrap(), "prot100").unwrap()
+        );
+        assert_eq!(
+            3.3,
+            StorageSqlite::get_float(res.get(0).unwrap(), "fat100").unwrap()
+        );
+        assert_eq!(
+            4.4,
+            StorageSqlite::get_float(res.get(0).unwrap(), "carb100").unwrap()
+        );
+        assert_eq!(
+            String::from("comment"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+        );
+
+        // Update food
+        stg.set_food(&Food {
+            key: "key".into(),
+            name: "name".into(),
+            brand: "".into(),
+            cal100: 5.5,
+            prot100: 6.6,
+            fat100: 7.7,
+            carb100: 8.8,
+            comment: "".into(),
+        })?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT
+                key, name, brand, cal100,
+                prot100, fat100, carb100, comment
+            FROM food
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            String::from("key"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+        );
+        assert_eq!(
+            String::from("name"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+        );
+        assert_eq!(
+            String::from(""),
+            StorageSqlite::get_string(res.get(0).unwrap(), "brand").unwrap()
+        );
+        assert_eq!(
+            5.5,
+            StorageSqlite::get_float(res.get(0).unwrap(), "cal100").unwrap()
+        );
+        assert_eq!(
+            6.6,
+            StorageSqlite::get_float(res.get(0).unwrap(), "prot100").unwrap()
+        );
+        assert_eq!(
+            7.7,
+            StorageSqlite::get_float(res.get(0).unwrap(), "fat100").unwrap()
+        );
+        assert_eq!(
+            8.8,
+            StorageSqlite::get_float(res.get(0).unwrap(), "carb100").unwrap()
+        );
+        assert_eq!(
+            String::from(""),
+            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+        );
+
+        Ok(())
+    }
 
     //
     // Restore/backup
@@ -473,14 +653,30 @@ mod test {
         let stg = StorageSqlite::new(db_file.path())?;
 
         // Do restore
-        stg.restore(&Backup{
+        stg.restore(&Backup {
             timestamp: 1,
             weight: vec![
-                WeightBackup{timestamp: 1, user_id: 1, value: 1.1},
-                WeightBackup{timestamp: 2, user_id: 1, value: 2.2},
-                WeightBackup{timestamp: 3, user_id: 1, value: 3.3},
-                WeightBackup{timestamp: 4, user_id: 2, value: 4.4},
-            ]
+                WeightBackup {
+                    timestamp: 1,
+                    user_id: 1,
+                    value: 1.1,
+                },
+                WeightBackup {
+                    timestamp: 2,
+                    user_id: 1,
+                    value: 2.2,
+                },
+                WeightBackup {
+                    timestamp: 3,
+                    user_id: 1,
+                    value: 3.3,
+                },
+                WeightBackup {
+                    timestamp: 4,
+                    user_id: 2,
+                    value: 4.4,
+                },
+            ],
         })?;
 
         // Check weight list for user 1

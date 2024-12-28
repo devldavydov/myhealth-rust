@@ -40,4 +40,8 @@ pub enum StorageError {
     NotFound,
     #[error("empty list")]
     EmptyList,
+    #[error("invalid weight")]
+    InvalidWeight,
+    #[error("invalid food")]
+    InvalidFood,
 }
