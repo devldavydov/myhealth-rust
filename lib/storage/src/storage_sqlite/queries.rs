@@ -107,6 +107,19 @@ pub const DELETE_FOOD: &str = "
     WHERE key = ?1
 ";
 
+pub const FIND_FOOD: &str = "
+    SELECT 
+        key, name, brand, cal100,
+        prot100, fat100, carb100, comment
+    FROM food
+    WHERE
+        r_upper(key)     LIKE '%' || ?1 || '%' OR
+        r_upper(name)    LIKE '%' || ?1 || '%' OR
+        r_upper(brand)   LIKE '%' || ?1 || '%' OR
+        r_upper(comment) LIKE '%' || ?1 || '%'
+    ORDER BY name
+";
+
 //
 // Journal
 //

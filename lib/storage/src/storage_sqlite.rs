@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
 use model::{backup::Backup, Bundle, Food, UserSettings, Weight};
-use rusqlite::{params, types::Value, Connection, Params};
+use rusqlite::{functions::FunctionFlags, params, types::Value, Connection, Params};
 use types::timestamp::Timestamp;
 
 mod migrations;
@@ -22,6 +22,8 @@ impl StorageSqlite {
             db_file.to_str().unwrap(),
         ))
         .context("open db connection")?;
+
+        Self::add_custom_functions(&conn).context("add custom functions")?;
 
         let s = Self {
             conn: Mutex::new(conn),
@@ -119,6 +121,19 @@ impl StorageSqlite {
         }
 
         bail!("migration_id not found");
+    }
+
+    fn add_custom_functions(conn: &Connection) -> Result<()> {
+        conn.create_scalar_function(
+            "r_upper",
+            1,
+            FunctionFlags::SQLITE_UTF8 | FunctionFlags::SQLITE_DETERMINISTIC,
+            move |ctx| {
+                assert_eq!(ctx.len(), 1, "called with unexpected number of arguments");
+                Ok(ctx.get_raw(0).as_str()?.to_uppercase())
+            },
+        )
+        .map_err(|e| anyhow!(e))
     }
 
     fn get_timestamp(row: &HashMap<String, Value>, field: &str) -> Result<Timestamp> {
@@ -220,8 +235,28 @@ impl Storage for StorageSqlite {
         .context("upsert food query")
     }
 
-    fn find_food(&self, pattern: String) -> Result<Vec<Food>> {
-        todo!()
+    fn find_food(&self, pattern: &str) -> Result<Vec<Food>> {
+        let db_res = self
+            .raw_query(queries::FIND_FOOD, params![pattern.to_uppercase()])
+            .context("find food list query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+
+        let mut food_list = Vec::with_capacity(db_res.len());
+        for row in &db_res {
+            food_list.push(Food {
+                key: Self::get_string(row, "key").context("get food key field")?,
+                name: Self::get_string(row, "name").context("get food name field")?,
+                brand: Self::get_string(row, "brand").context("get food brand field")?,
+                cal100: Self::get_float(row, "cal100").context("get food cal100 field")?,
+                prot100: Self::get_float(row, "prot100").context("get food prot100 field")?,
+                fat100: Self::get_float(row, "fat100").context("get food fat100 field")?,
+                carb100: Self::get_float(row, "carb100").context("get food carb100 field")?,
+                comment: Self::get_string(row, "comment").context("get food comment field")?,
+            });
+        }
+
+        Ok(food_list)
     }
 
     fn delete_food(&self, key: &str) -> Result<()> {
@@ -794,6 +829,65 @@ mod test {
         // Get food list
         let res = stg.get_food_list();
         assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_find_food() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Find empty result
+        let res = stg.find_food("some food");
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        // Set food
+        let f1 = Food {
+            key: "key1".into(),
+            name: "name1".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        };
+        stg.set_food(&f1)?;
+
+        let f2 = Food {
+            key: "key2".into(),
+            name: "name2".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        };
+        stg.set_food(&f2)?;
+
+        let f3 = Food {
+            key: "key3".into(),
+            name: "Сырок Дружба".into(),
+            brand: "Вкусвилл".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "Вкусный".into(),
+        };
+        stg.set_food(&f3)?;
+
+        // Find food
+        assert_eq!(
+            vec![f1.clone(), f2.clone(), f3.clone()],
+            stg.find_food("kEy").unwrap()
+        );
+        assert_eq!(vec![f2], stg.find_food("NAMe2").unwrap());
+        assert_eq!(vec![f3.clone()], stg.find_food("дружба").unwrap());
+        assert_eq!(vec![f3.clone()], stg.find_food("вкусВиЛЛ").unwrap());
+        assert_eq!(vec![f3.clone()], stg.find_food("нЫЙ").unwrap());
 
         Ok(())
     }

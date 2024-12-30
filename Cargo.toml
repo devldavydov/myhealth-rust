@@ -34,7 +34,7 @@ log = "0"
 env_logger = "0"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 clap = { version = "4", features = ["derive"] }
-rusqlite = { version = "0.32.0", features = ["bundled"] }
+rusqlite = { version = "0.32.0", features = ["bundled", "functions"] }
 tempfile = "3"
 thiserror = "2"
 minijinja = "2"

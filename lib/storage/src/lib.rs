@@ -10,7 +10,7 @@ pub trait Storage: Send + Sync {
     fn get_food(&self, key: &str) -> Result<Food>;
     fn get_food_list(&self) -> Result<Vec<Food>>;
     fn set_food(&self, food: &Food) -> Result<()>;
-    fn find_food(&self, pattern: String) -> Result<Vec<Food>>;
+    fn find_food(&self, pattern: &str) -> Result<Vec<Food>>;
     fn delete_food(&self, key: &str) -> Result<()>;
     // Bundle
     fn get_bundle(&self, user_id: i64, key: &str) -> Result<Bundle>;
