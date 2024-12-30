@@ -86,6 +86,27 @@ pub const UPSERT_FOOD: &str = "
         comment = ?8
 ";
 
+pub const SELECT_FOOD: &str = "
+    SELECT 
+        key, name, brand, cal100,
+        prot100, fat100, carb100, comment
+    FROM food
+    WHERE key = ?1
+";
+
+pub const SELECT_FOOD_LIST: &str = "
+    SELECT 
+        key, name, brand, cal100,
+        prot100, fat100, carb100, comment
+    FROM food
+    ORDER BY name
+";
+
+pub const DELETE_FOOD: &str = "
+    DELETE FROM food
+    WHERE key = ?1
+";
+
 //
 // Journal
 //

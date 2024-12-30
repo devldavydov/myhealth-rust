@@ -156,11 +156,48 @@ impl Storage for StorageSqlite {
     //
 
     fn get_food(&self, key: &str) -> Result<Food> {
-        todo!()
+        let db_res = self
+            .raw_query(queries::SELECT_FOOD, params![key])
+            .context("get food query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::NotFound);
+
+        let row = db_res.first().unwrap();
+
+        Ok(Food {
+            key: Self::get_string(row, "key").context("get food key field")?,
+            name: Self::get_string(row, "name").context("get food name field")?,
+            brand: Self::get_string(row, "brand").context("get food brand field")?,
+            cal100: Self::get_float(row, "cal100").context("get food cal100 field")?,
+            prot100: Self::get_float(row, "prot100").context("get food prot100 field")?,
+            fat100: Self::get_float(row, "fat100").context("get food fat100 field")?,
+            carb100: Self::get_float(row, "carb100").context("get food carb100 field")?,
+            comment: Self::get_string(row, "comment").context("get food comment field")?,
+        })
     }
 
     fn get_food_list(&self) -> Result<Vec<Food>> {
-        todo!()
+        let db_res = self
+            .raw_query(queries::SELECT_FOOD_LIST, params![])
+            .context("get food list query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+
+        let mut food_list = Vec::with_capacity(db_res.len());
+        for row in &db_res {
+            food_list.push(Food {
+                key: Self::get_string(row, "key").context("get food key field")?,
+                name: Self::get_string(row, "name").context("get food name field")?,
+                brand: Self::get_string(row, "brand").context("get food brand field")?,
+                cal100: Self::get_float(row, "cal100").context("get food cal100 field")?,
+                prot100: Self::get_float(row, "prot100").context("get food prot100 field")?,
+                fat100: Self::get_float(row, "fat100").context("get food fat100 field")?,
+                carb100: Self::get_float(row, "carb100").context("get food carb100 field")?,
+                comment: Self::get_string(row, "comment").context("get food comment field")?,
+            });
+        }
+
+        Ok(food_list)
     }
 
     fn set_food(&self, food: &Food) -> Result<()> {
@@ -180,7 +217,7 @@ impl Storage for StorageSqlite {
                 food.comment
             ],
         )
-        .context("upsert weight query")
+        .context("upsert food query")
     }
 
     fn find_food(&self, pattern: String) -> Result<Vec<Food>> {
@@ -188,7 +225,8 @@ impl Storage for StorageSqlite {
     }
 
     fn delete_food(&self, key: &str) -> Result<()> {
-        todo!()
+        self.raw_execute(queries::DELETE_FOOD, false, params![key])
+            .context("delete food query")
     }
 
     //
@@ -229,8 +267,8 @@ impl Storage for StorageSqlite {
         for row in &db_res {
             res.push(Weight {
                 timestamp: Self::get_timestamp(row, "timestamp")
-                    .context("weight timestamp field")?,
-                value: Self::get_float(row, "value").context("weight value field")?,
+                    .context("get weight timestamp field")?,
+                value: Self::get_float(row, "value").context("get weight value field")?,
             });
         }
 
@@ -639,6 +677,123 @@ mod test {
             String::from(""),
             StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_food() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get food that not exists
+        let res = stg.get_food("key");
+        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+
+        // Set food
+        let f = Food {
+            key: "key".into(),
+            name: "name".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        };
+        stg.set_food(&f)?;
+
+        // Get food
+        assert_eq!(f, stg.get_food("key").unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_food_list() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get empty food list
+        let res = stg.get_food_list();
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        // Set food
+        let f1 = Food {
+            key: "key1".into(),
+            name: "name1".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        };
+        stg.set_food(&f1)?;
+
+        let f2 = Food {
+            key: "key2".into(),
+            name: "name2".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        };
+        stg.set_food(&f2)?;
+
+        // Get food list
+        assert_eq!(vec![f1, f2], stg.get_food_list().unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete_food() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set food
+        let f1 = Food {
+            key: "key1".into(),
+            name: "name1".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        };
+        stg.set_food(&f1)?;
+
+        let f2 = Food {
+            key: "key2".into(),
+            name: "name2".into(),
+            brand: "brand".into(),
+            cal100: 1.1,
+            prot100: 2.2,
+            fat100: 3.3,
+            carb100: 4.4,
+            comment: "comment".into(),
+        };
+        stg.set_food(&f2)?;
+
+        // Get food list
+        assert_eq!(vec![f1, f2.clone()], stg.get_food_list().unwrap());
+
+        // Delete food1
+        stg.delete_food("key1")?;
+
+        // Get food list
+        assert_eq!(vec![f2], stg.get_food_list().unwrap());
+
+        // Delete food1
+        stg.delete_food("key2")?;
+
+        // Get food list
+        let res = stg.get_food_list();
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
 
         Ok(())
     }

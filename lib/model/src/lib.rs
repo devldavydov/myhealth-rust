@@ -4,6 +4,7 @@ use types::timestamp::Timestamp;
 
 pub mod backup;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Food {
     pub key: String,
     pub name: String,
