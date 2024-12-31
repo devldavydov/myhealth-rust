@@ -6,6 +6,8 @@ pub struct Backup {
     pub timestamp: i64,
     #[serde(rename = "weight")]
     pub weight: Vec<WeightBackup>,
+    #[serde(rename = "food")]
+    pub food: Vec<FoodBackup>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -16,4 +18,24 @@ pub struct WeightBackup {
     pub timestamp: i64,
     #[serde(rename = "value")]
     pub value: f64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FoodBackup {
+    #[serde(rename = "key")]
+    pub key: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "brand")]
+    pub brand: String,
+    #[serde(rename = "cal100")]
+    pub cal100: f64,
+    #[serde(rename = "prot100")]
+    pub prot100: f64,
+    #[serde(rename = "fat100")]
+    pub fat100: f64,
+    #[serde(rename = "carb100")]
+    pub carb100: f64,
+    #[serde(rename = "comment")]
+    pub comment: String,
 }

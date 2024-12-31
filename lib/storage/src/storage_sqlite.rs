@@ -356,6 +356,17 @@ impl Storage for StorageSqlite {
             .context("upsert backup weight query")?;
         }
 
+        for f in &backup.food {
+            self.raw_execute(
+                queries::UPSERT_FOOD,
+                false,
+                params![
+                    f.key, f.name, f.brand, f.cal100, f.prot100, f.fat100, f.carb100, f.comment
+                ],
+            )
+            .context("upsert backup food query")?;
+        }
+
         Ok(())
     }
 
@@ -376,7 +387,7 @@ impl Storage for StorageSqlite {
 mod test {
     use super::*;
     use anyhow::Result;
-    use model::backup::WeightBackup;
+    use model::backup::{FoodBackup, WeightBackup};
     use tempfile::NamedTempFile;
 
     //
@@ -926,6 +937,28 @@ mod test {
                     value: 4.4,
                 },
             ],
+            food: vec![
+                FoodBackup {
+                    key: "key2".into(),
+                    name: "Food 2".into(),
+                    brand: "Brand2".into(),
+                    cal100: 5.5,
+                    prot100: 6.6,
+                    fat100: 7.7,
+                    carb100: 8.8,
+                    comment: "Comment2".into(),
+                },
+                FoodBackup {
+                    key: "key1".into(),
+                    name: "Food 1".into(),
+                    brand: "Brand 1".into(),
+                    cal100: 1.1,
+                    prot100: 2.2,
+                    fat100: 3.3,
+                    carb100: 4.4,
+                    comment: "Comment".into(),
+                },                
+            ],
         })?;
 
         // Check weight list for user 1
@@ -933,7 +966,7 @@ mod test {
             1,
             Timestamp::from_unix_millis(0).unwrap(),
             Timestamp::from_unix_millis(10).unwrap(),
-        );
+        )?;
         assert_eq!(
             vec![
                 Weight {
@@ -949,7 +982,7 @@ mod test {
                     value: 3.3
                 },
             ],
-            res.unwrap()
+            res
         );
 
         // Check weight list for user 2
@@ -957,13 +990,41 @@ mod test {
             2,
             Timestamp::from_unix_millis(0).unwrap(),
             Timestamp::from_unix_millis(10).unwrap(),
-        );
+        )?;
         assert_eq!(
             vec![Weight {
                 timestamp: Timestamp::from_unix_millis(4).unwrap(),
                 value: 4.4
             },],
-            res.unwrap()
+            res
+        );
+
+        // Check food
+        let res = stg.get_food_list()?;
+        assert_eq!(
+            vec![
+                Food {
+                    key: "key1".into(),
+                    name: "Food 1".into(),
+                    brand: "Brand 1".into(),
+                    cal100: 1.1,
+                    prot100: 2.2,
+                    fat100: 3.3,
+                    carb100: 4.4,
+                    comment: "Comment".into(),
+                },
+                Food {
+                    key: "key2".into(),
+                    name: "Food 2".into(),
+                    brand: "Brand2".into(),
+                    cal100: 5.5,
+                    prot100: 6.6,
+                    fat100: 7.7,
+                    carb100: 8.8,
+                    comment: "Comment2".into(),
+                }
+            ],
+            res
         );
 
         Ok(())
