@@ -7,12 +7,17 @@ pub struct H {
 }
 
 impl H {
-    pub fn new(val: &str, size: u8, attrs: Attrs) -> Self {
+    pub fn new(val: &str, size: u8) -> Self {
         Self {
             val: val.into(),
             size,
-            attrs,
+            attrs: Attrs::default(),
         }
+    }
+
+    pub fn set_attr(mut self, attrs: Attrs) -> Self {
+        self.attrs = attrs;
+        self
     }
 }
 
