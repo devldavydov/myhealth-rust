@@ -51,6 +51,19 @@ pub struct Bundle {
     pub data: HashMap<String, f64>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sport {
+    pub key: String,
+    pub name: String,
+    pub comment: String,
+}
+
+pub struct SportActivity {
+    pub sport_key: String,
+    pub timestamp: Timestamp,
+    pub sets: Vec<i64>,
+}
+
 impl Food {
     pub fn validate(&self) -> bool {
         !self.key.is_empty()
@@ -123,13 +136,25 @@ impl Bundle {
     }
 }
 
+impl Sport {
+    pub fn validate(&self) -> bool {
+        !self.key.is_empty() && !self.name.is_empty()
+    }
+}
+
+impl SportActivity {
+    pub fn validate(&self) -> bool {
+        !self.sport_key.is_empty() && !self.sets.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
 
     use types::timestamp::Timestamp;
 
-    use crate::{Bundle, Food, Journal, Meal, UserSettings, Weight};
+    use crate::{Bundle, Food, Journal, Meal, Sport, SportActivity, UserSettings, Weight};
 
     #[test]
     fn test_validate_food() {
@@ -326,5 +351,67 @@ mod test {
         ] {
             assert_eq!(t.0.validate(), t.1);
         }
+    }
+
+    #[test]
+    fn test_validate_sport() {
+        assert_eq!(
+            Sport {
+                name: "".into(),
+                key: "".into(),
+                comment: "".into()
+            }
+            .validate(),
+            false
+        );
+        assert_eq!(
+            Sport {
+                name: "sport".into(),
+                key: "".into(),
+                comment: "".into()
+            }
+            .validate(),
+            false
+        );
+        assert_eq!(
+            Sport {
+                name: "sport".into(),
+                key: "key".into(),
+                comment: "".into()
+            }
+            .validate(),
+            true
+        );
+    }
+
+    #[test]
+    fn test_validate_sport_activity() {
+        assert_eq!(
+            SportActivity {
+                sport_key: "".into(),
+                sets: vec![],
+                timestamp: Timestamp::now(),
+            }
+            .validate(),
+            false
+        );
+        assert_eq!(
+            SportActivity {
+                sport_key: "key".into(),
+                sets: vec![],
+                timestamp: Timestamp::now(),
+            }
+            .validate(),
+            false
+        );
+        assert_eq!(
+            SportActivity {
+                sport_key: "key".into(),
+                sets: vec![1, 2],
+                timestamp: Timestamp::now(),
+            }
+            .validate(),
+            true
+        );
     }
 }

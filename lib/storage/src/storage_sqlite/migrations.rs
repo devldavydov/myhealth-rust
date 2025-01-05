@@ -58,6 +58,8 @@ fn create_tables(tx: &Transaction) -> Result<()> {
         .context("exec create table bundle_food")?;
     tx.execute(queries::CREATE_TABLE_USER_SETTINGS, [])
         .context("exec create table user settings")?;
+    tx.execute(queries::CREATE_TABLE_SPORT, [])
+        .context("exec create table sport")?;
 
     Ok(())
 }

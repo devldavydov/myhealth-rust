@@ -179,3 +179,38 @@ pub const CREATE_TABLE_USER_SETTINGS: &str = "
         cal_limit REAL    NOT NULL
     )
 ";
+
+//
+// Sport
+//
+
+
+pub const CREATE_TABLE_SPORT: &str = "
+    CREATE TABLE sport (
+        key     TEXT NOT NULL PRIMARY KEY,
+        name    TEXT NOT NULL,
+        comment TEXT NULL
+    )
+";
+
+pub const SELECT_SPORT_LIST: &str = "
+    SELECT 
+        key, name, comment
+    FROM sport
+    ORDER BY name
+";
+
+pub const DELETE_SPORT: &str = "
+    DELETE FROM sport
+    WHERE key = ?1
+";
+
+pub const UPSERT_SPORT: &str = "
+    INSERT INTO sport (
+        key, name, comment
+    )
+    VALUES (?1, ?2, ?3)
+    ON CONFLICT (key) DO
+    UPDATE SET
+        name = ?2, comment = ?3
+";

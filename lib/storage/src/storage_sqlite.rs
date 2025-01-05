@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
-use model::{backup::Backup, Bundle, Food, UserSettings, Weight};
+use model::{backup::Backup, Bundle, Food, Sport, UserSettings, Weight};
 use rusqlite::{functions::FunctionFlags, params, types::Value, Connection, Params};
 use types::timestamp::Timestamp;
 
@@ -232,7 +232,7 @@ impl Storage for StorageSqlite {
                 food.comment
             ],
         )
-        .context("upsert food query")
+        .context("exec upsert food")
     }
 
     fn find_food(&self, pattern: &str) -> Result<Vec<Food>> {
@@ -261,7 +261,7 @@ impl Storage for StorageSqlite {
 
     fn delete_food(&self, key: &str) -> Result<()> {
         self.raw_execute(queries::DELETE_FOOD, false, params![key])
-            .context("delete food query")
+            .context("exec delete food")
     }
 
     //
@@ -318,7 +318,7 @@ impl Storage for StorageSqlite {
             false,
             params![user_id, weight.timestamp.unix_millis(), weight.value],
         )
-        .context("upsert weight query")
+        .context("exec upsert weight")
     }
 
     fn delete_weight(&self, user_id: i64, timestamp: Timestamp) -> Result<()> {
@@ -327,7 +327,7 @@ impl Storage for StorageSqlite {
             false,
             params![user_id, timestamp.unix_millis()],
         )
-        .context("delete weight query")
+        .context("exec delete weight")
     }
 
     //
@@ -340,6 +340,45 @@ impl Storage for StorageSqlite {
 
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()> {
         todo!()
+    }
+
+    //
+    // Sport
+    //
+
+    fn get_sport_list(&self) -> Result<Vec<Sport>> {
+        let db_res = self
+            .raw_query(queries::SELECT_SPORT_LIST, params![])
+            .context("get sport list query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+
+        let mut sport_list = Vec::with_capacity(db_res.len());
+        for row in &db_res {
+            sport_list.push(Sport {
+                key: Self::get_string(row, "key").context("get sport key field")?,
+                name: Self::get_string(row, "name").context("get sport name field")?,
+                comment: Self::get_string(row, "comment").context("get sport comment field")?,
+            });
+        }
+
+        Ok(sport_list)
+    }
+
+    fn set_sport(&self, sport: &Sport) -> Result<()> {
+        ensure!(sport.validate(), StorageError::InvalidSport);
+
+        self.raw_execute(
+            queries::UPSERT_SPORT,
+            false,
+            params![sport.key, sport.name, sport.comment],
+        )
+        .context("exec upsert sport")
+    }
+
+    fn delete_sport(&self, key: &str) -> Result<()> {
+        self.raw_execute(queries::DELETE_SPORT, false, params![key])
+            .context("exec delete sport")
     }
 
     //
@@ -834,7 +873,7 @@ mod test {
         // Get food list
         assert_eq!(vec![f2], stg.get_food_list().unwrap());
 
-        // Delete food1
+        // Delete food2
         stg.delete_food("key2")?;
 
         // Get food list
@@ -899,6 +938,157 @@ mod test {
         assert_eq!(vec![f3.clone()], stg.find_food("дружба").unwrap());
         assert_eq!(vec![f3.clone()], stg.find_food("вкусВиЛЛ").unwrap());
         assert_eq!(vec![f3.clone()], stg.find_food("нЫЙ").unwrap());
+
+        Ok(())
+    }
+
+    //
+    // Sport
+    //
+
+    #[test]
+    fn test_set_sport() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set invalid sport
+        let res = stg.set_sport(&Sport {
+            key: "".into(),
+            name: "name".into(),
+            comment: "comment".into(),
+        });
+        assert!(stg.is_storage_error(StorageError::InvalidSport, &res.unwrap_err()));
+
+        // Set sport
+        stg.set_sport(&Sport {
+            key: "key".into(),
+            name: "name".into(),
+            comment: "comment".into(),
+        })?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT
+                key, name, comment
+            FROM sport
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            String::from("key"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+        );
+        assert_eq!(
+            String::from("name"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+        );       
+        assert_eq!(
+            String::from("comment"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+        );
+
+        // Update sport
+        stg.set_sport(&Sport {
+            key: "key".into(),
+            name: "name".into(),
+            comment: "".into(),
+        })?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT
+                key, name, comment
+            FROM sport
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            String::from("key"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+        );
+        assert_eq!(
+            String::from("name"),
+            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+        );       
+        assert_eq!(
+            String::from(""),
+            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sport_list() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get empty sport list
+        let res = stg.get_sport_list();
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        // Set sport
+        let s1 = Sport {
+            key: "key1".into(),
+            name: "name1".into(),
+            comment: "comment".into(),
+        };
+        stg.set_sport(&s1)?;
+
+        let s2 = Sport {
+            key: "key2".into(),
+            name: "name2".into(),           
+            comment: "comment".into(),
+        };
+        stg.set_sport(&s2)?;
+
+        // Get sport list
+        assert_eq!(vec![s1, s2], stg.get_sport_list().unwrap());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete_sport() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set sport
+        let s1 = Sport {
+            key: "key1".into(),
+            name: "name1".into(),
+            comment: "comment".into(),
+        };
+        stg.set_sport(&s1)?;
+
+        let s2 = Sport {
+            key: "key2".into(),
+            name: "name2".into(),
+            comment: "comment".into(),
+        };
+        stg.set_sport(&s2)?;
+
+        // Get sport list
+        assert_eq!(vec![s1, s2.clone()], stg.get_sport_list().unwrap());
+
+        // Delete sport1
+        stg.delete_sport("key1")?;
+
+        // Get sport list
+        assert_eq!(vec![s2], stg.get_sport_list().unwrap());
+
+        // Delete sport2
+        stg.delete_sport("key2")?;
+
+        // Get sport list
+        let res = stg.get_sport_list();
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
 
         Ok(())
     }
