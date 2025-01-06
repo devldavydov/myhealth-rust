@@ -34,7 +34,11 @@ fn update_migration_id(tx: &Transaction, migration_id: i64) -> Result<()> {
 }
 
 fn get_all_migrations() -> Migrations {
-    vec![(1, insert_initial_migration_id), (2, create_tables)]
+    vec![
+        (1, insert_initial_migration_id),
+        (2, create_tables_weight_food),
+        (3, create_tables_sport),
+    ]
 }
 
 fn insert_initial_migration_id(tx: &Transaction) -> Result<()> {
@@ -43,21 +47,16 @@ fn insert_initial_migration_id(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
-fn create_tables(tx: &Transaction) -> Result<()> {
+fn create_tables_weight_food(tx: &Transaction) -> Result<()> {
     tx.execute(queries::CREATE_TABLE_WEIGHT, [])
         .context("exec create table weight")?;
     tx.execute(queries::CREATE_TABLE_FOOD, [])
         .context("exec create table food")?;
-    tx.execute(queries::CREATE_TABLE_JOURNAL, [])
-        .context("exec create table journal")?;
-    tx.execute(queries::CREATE_TABLE_BUNDLE, [])
-        .context("exec create table bundle")?;
-    tx.execute(queries::CREATE_TABLE_BUNDLE_FOOD_ITEMS, [])
-        .context("exec create table bundle_bundle")?;
-    tx.execute(queries::CREATE_TABLE_BUNDLE_BUNDLE_ITEMS, [])
-        .context("exec create table bundle_food")?;
-    tx.execute(queries::CREATE_TABLE_USER_SETTINGS, [])
-        .context("exec create table user settings")?;
+
+    Ok(())
+}
+
+fn create_tables_sport(tx: &Transaction) -> Result<()> {
     tx.execute(queries::CREATE_TABLE_SPORT, [])
         .context("exec create table sport")?;
 

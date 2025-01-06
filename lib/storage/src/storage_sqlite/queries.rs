@@ -184,13 +184,19 @@ pub const CREATE_TABLE_USER_SETTINGS: &str = "
 // Sport
 //
 
-
 pub const CREATE_TABLE_SPORT: &str = "
     CREATE TABLE sport (
         key     TEXT NOT NULL PRIMARY KEY,
         name    TEXT NOT NULL,
         comment TEXT NULL
     )
+";
+
+pub const SELECT_SPORT: &str = "
+    SELECT 
+        key, name, comment
+    FROM sport
+    WHERE key = ?1
 ";
 
 pub const SELECT_SPORT_LIST: &str = "

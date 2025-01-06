@@ -259,7 +259,7 @@ async fn food_find(
         Ok(f) => f,
     };
 
-    let mut res = format!("");
+    let mut res = String::new();
     for (i, f) in food.iter().enumerate() {
         res.push_str(&format!("<b>Ключ: </b>{}\n", f.key));
         res.push_str(&format!("<b>Наименование:</b> {}\n", f.name));
@@ -271,7 +271,7 @@ async fn food_find(
         res.push_str(&format!("<b>Комментарий:</b> {}\n", f.comment));
 
         if i != res.len() - 1 {
-            res.push_str("\n");
+            res.push('\n');
         }
     }
 

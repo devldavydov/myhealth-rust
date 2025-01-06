@@ -346,6 +346,22 @@ impl Storage for StorageSqlite {
     // Sport
     //
 
+    fn get_sport(&self, key: &str) -> Result<Sport> {
+        let db_res = self
+            .raw_query(queries::SELECT_SPORT, params![key])
+            .context("get sport query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::NotFound);
+
+        let row = db_res.first().unwrap();
+
+        Ok(Sport {
+            key: Self::get_string(row, "key").context("get sport key field")?,
+            name: Self::get_string(row, "name").context("get food sport field")?,
+            comment: Self::get_string(row, "comment").context("get sport comment field")?,
+        })
+    }
+
     fn get_sport_list(&self) -> Result<Vec<Sport>> {
         let db_res = self
             .raw_query(queries::SELECT_SPORT_LIST, params![])
@@ -438,7 +454,7 @@ mod test {
         let db_file = NamedTempFile::new()?;
         let stg = StorageSqlite::new(db_file.path())?;
 
-        assert_eq!(2, stg.get_last_migration_id().unwrap());
+        assert_eq!(3, stg.get_last_migration_id().unwrap());
 
         Ok(())
     }
@@ -984,7 +1000,7 @@ mod test {
         assert_eq!(
             String::from("name"),
             StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
-        );       
+        );
         assert_eq!(
             String::from("comment"),
             StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
@@ -1015,11 +1031,34 @@ mod test {
         assert_eq!(
             String::from("name"),
             StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
-        );       
+        );
         assert_eq!(
             String::from(""),
             StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sport() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get sport that not exists
+        let res = stg.get_sport("key");
+        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+
+        // Set sport
+        let s = Sport {
+            key: "key".into(),
+            name: "name".into(),
+            comment: "comment".into(),
+        };
+        stg.set_sport(&s)?;
+
+        // Get sport
+        assert_eq!(s, stg.get_sport("key").unwrap());
 
         Ok(())
     }
@@ -1043,7 +1082,7 @@ mod test {
 
         let s2 = Sport {
             key: "key2".into(),
-            name: "name2".into(),           
+            name: "name2".into(),
             comment: "comment".into(),
         };
         stg.set_sport(&s2)?;

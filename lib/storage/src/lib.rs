@@ -26,6 +26,7 @@ pub trait Storage: Send + Sync {
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings>;
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()>;
     // Sport
+    fn get_sport(&self, key: &str) -> Result<Sport>;
     fn get_sport_list(&self) -> Result<Vec<Sport>>;
     fn set_sport(&self, sport: &Sport) -> Result<()>;
     fn delete_sport(&self, key: &str) -> Result<()>;
