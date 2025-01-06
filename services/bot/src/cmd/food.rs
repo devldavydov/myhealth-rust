@@ -158,7 +158,7 @@ async fn food_set_template(
     bot.send_message(
         chat_id,
         format!(
-            "f,st,{},{},{},{:.2},{:.2},{:.2},{:.2},{}",
+            "f,set,{},{},{},{:.2},{:.2},{:.2},{:.2},{}",
             food.key,
             food.name,
             food.brand,

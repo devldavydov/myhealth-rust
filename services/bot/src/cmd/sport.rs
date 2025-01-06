@@ -105,7 +105,7 @@ async fn sport_set_template(
     bot.send_message(
         chat_id,
         format!(
-            "s,st,{},{},{}",
+            "s,set,{},{},{}",
             sport.key,
             sport.name,
             sport.comment
