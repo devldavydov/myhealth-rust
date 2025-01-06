@@ -37,7 +37,8 @@ fn get_all_migrations() -> Migrations {
     vec![
         (1, insert_initial_migration_id),
         (2, create_tables_weight_food),
-        (3, create_tables_sport),
+        (3, create_table_sport),
+        (4, create_table_sport_activity),
     ]
 }
 
@@ -56,9 +57,16 @@ fn create_tables_weight_food(tx: &Transaction) -> Result<()> {
     Ok(())
 }
 
-fn create_tables_sport(tx: &Transaction) -> Result<()> {
+fn create_table_sport(tx: &Transaction) -> Result<()> {
     tx.execute(queries::CREATE_TABLE_SPORT, [])
         .context("exec create table sport")?;
+
+    Ok(())
+}
+
+fn create_table_sport_activity(tx: &Transaction) -> Result<()> {
+    tx.execute(queries::CREATE_TABLE_SPORT_ACTIVITY, [])
+        .context("exec create table sport activity")?;
 
     Ok(())
 }

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use model::{backup::Backup, Bundle, Food, Sport, UserSettings, Weight};
+use model::{backup::Backup, Bundle, Food, Sport, SportActivity, UserSettings, Weight};
 use thiserror::Error;
 use types::timestamp::Timestamp;
 
@@ -31,6 +31,7 @@ pub trait Storage: Send + Sync {
     fn set_sport(&self, sport: &Sport) -> Result<()>;
     fn delete_sport(&self, key: &str) -> Result<()>;
     // SportActivity
+    fn set_sport_activity(&self, user_id: i64, act: &SportActivity) -> Result<()>;
     // Backup/Restore
     fn restore(&self, backup: &Backup) -> Result<()>;
     // Error
@@ -52,4 +53,6 @@ pub enum StorageError {
     InvalidFood,
     #[error("invalid sport")]
     InvalidSport,
+    #[error("invalid sport activity")]
+    InvalidSportActivity,
 }

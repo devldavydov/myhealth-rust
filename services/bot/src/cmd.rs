@@ -1,9 +1,9 @@
 mod bundle;
 mod food;
 mod journal;
+mod sport;
 mod user_settings;
 mod weight;
-mod sport;
 
 use super::messages;
 use chrono_tz::Tz;
@@ -78,10 +78,16 @@ pub async fn process_command(
                             tz,
                         )
                         .await?;
-                    },
+                    }
                     "s" => {
-                        sport::process_sport_command(bot,user_id, msg.chat.id, parts[1..].to_vec(), stg)
-                            .await?;
+                        sport::process_sport_command(
+                            bot,
+                            user_id,
+                            msg.chat.id,
+                            parts[1..].to_vec(),
+                            stg,
+                        )
+                        .await?;
                     }
                     _ => {
                         log::error!("unknown command");

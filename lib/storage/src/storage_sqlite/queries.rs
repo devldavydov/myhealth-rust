@@ -220,3 +220,28 @@ pub const UPSERT_SPORT: &str = "
     UPDATE SET
         name = ?2, comment = ?3
 ";
+
+//
+// Sport activity
+//
+
+pub const CREATE_TABLE_SPORT_ACTIVITY: &str = "
+    CREATE TABLE sport_activity (
+        user_id   INTEGER NOT NULL,
+        timestamp INTEGER NOT NULL,
+        sport_key TEXT NOT NULL,
+        sets      TEXT NOT NULL,
+        PRIMARY KEY (user_id, timestamp, sport_key),
+        FOREIGN KEY (sport_key) REFERENCES sport(key) ON DELETE RESTRICT
+    )
+";
+
+pub const UPSERT_SPORT_ACTIVITY: &str = "
+    INSERT INTO sport_activity (
+        user_id, timestamp, sport_key, sets
+    )
+    VALUES (?1, ?2, ?3, ?4)
+    ON CONFLICT (user_id, timestamp, sport_key) DO
+    UPDATE SET
+        sets = ?4
+";

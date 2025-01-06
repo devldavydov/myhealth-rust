@@ -4,8 +4,11 @@ use std::sync::Mutex;
 
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
-use model::{backup::Backup, Bundle, Food, Sport, UserSettings, Weight};
-use rusqlite::{functions::FunctionFlags, params, types::Value, Connection, Params};
+use model::{backup::Backup, Bundle, Food, Sport, SportActivity, UserSettings, Weight};
+use rusqlite::{
+    functions::FunctionFlags, params, types::Value, Connection, Error::SqliteFailure, Params,
+};
+use serde_json::json;
 use types::timestamp::Timestamp;
 
 mod migrations;
@@ -398,6 +401,45 @@ impl Storage for StorageSqlite {
     }
 
     //
+    // Sport activity
+    //
+
+    fn set_sport_activity(&self, user_id: i64, act: &SportActivity) -> Result<()> {
+        ensure!(act.validate(), StorageError::InvalidSportActivity);
+
+        // Convert sets to JSON array
+        let str_sets = serde_json::to_string(&json!(act.sets)).context("convert sport activity sets to JSON")?;
+
+        match self.raw_execute(
+            queries::UPSERT_SPORT_ACTIVITY,
+            false,
+            params![
+                user_id,
+                act.timestamp.unix_millis(),
+                act.sport_key,
+                str_sets
+            ],
+        ) {
+            Err(err) => {
+                for cause in err.chain() {
+                    if let Some(SqliteFailure(_, Some(val))) =
+                        cause.downcast_ref::<rusqlite::Error>()
+                    {
+                        if val == "FOREIGN KEY constraint failed" {
+                            bail!(StorageError::InvalidSport)
+                        };
+
+                        bail!(err);
+                    }
+                }
+
+                bail!(err);
+            }
+            _ => Ok(()),
+        }
+    }
+
+    //
     // Backup/Restore
     //
 
@@ -454,7 +496,7 @@ mod test {
         let db_file = NamedTempFile::new()?;
         let stg = StorageSqlite::new(db_file.path())?;
 
-        assert_eq!(3, stg.get_last_migration_id().unwrap());
+        assert_eq!(4, stg.get_last_migration_id().unwrap());
 
         Ok(())
     }
@@ -608,11 +650,11 @@ mod test {
         assert_eq!(1, res.len());
         assert_eq!(
             Timestamp::from_unix_millis(1734876557).unwrap(),
-            StorageSqlite::get_timestamp(res.get(0).unwrap(), "timestamp").unwrap()
+            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
         );
         assert_eq!(
             1.1,
-            StorageSqlite::get_float(res.get(0).unwrap(), "value").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "value").unwrap()
         );
 
         // Update weight
@@ -633,11 +675,11 @@ mod test {
         assert_eq!(1, res.len());
         assert_eq!(
             Timestamp::from_unix_millis(1734876557).unwrap(),
-            StorageSqlite::get_timestamp(res.get(0).unwrap(), "timestamp").unwrap()
+            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
         );
         assert_eq!(
             2.2,
-            StorageSqlite::get_float(res.get(0).unwrap(), "value").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "value").unwrap()
         );
 
         Ok(())
@@ -691,35 +733,35 @@ mod test {
         assert_eq!(1, res.len());
         assert_eq!(
             String::from("key"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
         );
         assert_eq!(
             String::from("name"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
         );
         assert_eq!(
             String::from("brand"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "brand").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "brand").unwrap()
         );
         assert_eq!(
             1.1,
-            StorageSqlite::get_float(res.get(0).unwrap(), "cal100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "cal100").unwrap()
         );
         assert_eq!(
             2.2,
-            StorageSqlite::get_float(res.get(0).unwrap(), "prot100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "prot100").unwrap()
         );
         assert_eq!(
             3.3,
-            StorageSqlite::get_float(res.get(0).unwrap(), "fat100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "fat100").unwrap()
         );
         assert_eq!(
             4.4,
-            StorageSqlite::get_float(res.get(0).unwrap(), "carb100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "carb100").unwrap()
         );
         assert_eq!(
             String::from("comment"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
         );
 
         // Update food
@@ -748,35 +790,35 @@ mod test {
         assert_eq!(1, res.len());
         assert_eq!(
             String::from("key"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
         );
         assert_eq!(
             String::from("name"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
         );
         assert_eq!(
             String::from(""),
-            StorageSqlite::get_string(res.get(0).unwrap(), "brand").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "brand").unwrap()
         );
         assert_eq!(
             5.5,
-            StorageSqlite::get_float(res.get(0).unwrap(), "cal100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "cal100").unwrap()
         );
         assert_eq!(
             6.6,
-            StorageSqlite::get_float(res.get(0).unwrap(), "prot100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "prot100").unwrap()
         );
         assert_eq!(
             7.7,
-            StorageSqlite::get_float(res.get(0).unwrap(), "fat100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "fat100").unwrap()
         );
         assert_eq!(
             8.8,
-            StorageSqlite::get_float(res.get(0).unwrap(), "carb100").unwrap()
+            StorageSqlite::get_float(res.first().unwrap(), "carb100").unwrap()
         );
         assert_eq!(
             String::from(""),
-            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
         );
 
         Ok(())
@@ -995,15 +1037,15 @@ mod test {
         assert_eq!(1, res.len());
         assert_eq!(
             String::from("key"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
         );
         assert_eq!(
             String::from("name"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
         );
         assert_eq!(
             String::from("comment"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
         );
 
         // Update sport
@@ -1026,15 +1068,15 @@ mod test {
         assert_eq!(1, res.len());
         assert_eq!(
             String::from("key"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "key").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
         );
         assert_eq!(
             String::from("name"),
-            StorageSqlite::get_string(res.get(0).unwrap(), "name").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
         );
         assert_eq!(
             String::from(""),
-            StorageSqlite::get_string(res.get(0).unwrap(), "comment").unwrap()
+            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
         );
 
         Ok(())
@@ -1128,6 +1170,117 @@ mod test {
         // Get sport list
         let res = stg.get_sport_list();
         assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        Ok(())
+    }
+
+    //
+    // Sport activity
+    //
+
+    #[test]
+    fn test_set_sport_activity() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set invalid sport activity
+        let res = stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "test".into(),
+                timestamp: Timestamp::now(),
+                sets: vec![],
+            },
+        );
+        assert!(stg.is_storage_error(StorageError::InvalidSportActivity, &res.unwrap_err()));
+
+        // Set sport activity for sport that not exists
+        let res = stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "test".into(),
+                timestamp: Timestamp::now(),
+                sets: vec![1, 2, 3],
+            },
+        );
+        assert!(stg.is_storage_error(StorageError::InvalidSport, &res.unwrap_err()));
+
+        // Set sport
+        stg.set_sport(&Sport {
+            key: "test".into(),
+            name: "test".into(),
+            comment: "".into(),
+        })?;
+
+        // Set sport activity
+        stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "test".into(),
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sets: vec![1],
+            },
+        )?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT
+                timestamp, sport_key, sets
+            FROM sport_activity
+            WHERE user_id = 1
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            Timestamp::from_unix_millis(1).unwrap(),
+            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
+        );
+        assert_eq!(
+            String::from("test"),
+            StorageSqlite::get_string(res.first().unwrap(), "sport_key").unwrap()
+        );
+        assert_eq!(
+            String::from("[1]"),
+            StorageSqlite::get_string(res.first().unwrap(), "sets").unwrap()
+        );
+
+        // Update sport activity
+        stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "test".into(),
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sets: vec![1, 2, 3],
+            },
+        )?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT
+                timestamp, sport_key, sets
+            FROM sport_activity
+            WHERE user_id = 1
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            Timestamp::from_unix_millis(1).unwrap(),
+            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
+        );
+        assert_eq!(
+            String::from("test"),
+            StorageSqlite::get_string(res.first().unwrap(), "sport_key").unwrap()
+        );
+        assert_eq!(
+            String::from("[1,2,3]"),
+            StorageSqlite::get_string(res.first().unwrap(), "sets").unwrap()
+        );
 
         Ok(())
     }

@@ -1,10 +1,19 @@
-use std::sync::Arc;
-use html::{attrs::Attrs, div::Div, h::H, s::S, table::{Table, Td, Tr}};
+use html::{
+    attrs::Attrs,
+    div::Div,
+    h::H,
+    s::S,
+    table::{Table, Td, Tr},
+};
 use model::Sport;
+use std::sync::Arc;
 use storage::{Storage, StorageError};
 use teloxide::{prelude::*, types::InputFile};
 
-use crate::{messages::{ERR_EMPTY, ERR_INTERNAL, ERR_SPORT_NOT_FOUND, ERR_WRONG_COMMAND, OK}, HandlerResult};
+use crate::{
+    messages::{ERR_EMPTY, ERR_INTERNAL, ERR_SPORT_NOT_FOUND, ERR_WRONG_COMMAND, OK},
+    HandlerResult,
+};
 
 pub async fn process_sport_command(
     bot: Bot,
@@ -58,11 +67,7 @@ async fn sport_set(
     let comment = args.get(2).unwrap().to_string();
 
     // Call storage
-    if let Err(err) = stg.set_sport(&Sport {
-        key,
-        name,
-        comment,
-    }) {
+    if let Err(err) = stg.set_sport(&Sport { key, name, comment }) {
         log::error!("set sport error: {err}");
         if stg.is_storage_error(StorageError::InvalidSport, &err) {
             bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
@@ -104,12 +109,7 @@ async fn sport_set_template(
 
     bot.send_message(
         chat_id,
-        format!(
-            "s,set,{},{},{}",
-            sport.key,
-            sport.name,
-            sport.comment
-        ),
+        format!("s,set,{},{},{}", sport.key, sport.name, sport.comment),
     )
     .await?;
 
