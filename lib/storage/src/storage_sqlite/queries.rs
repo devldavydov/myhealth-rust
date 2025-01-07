@@ -40,6 +40,8 @@ pub const SELECT_WEIGHT_LIST: &str = "
         user_id = ?1 AND
         timestamp >= ?2 AND
         timestamp <= ?3
+    ORDER BY
+        timestamp
 ";
 
 pub const DELETE_WEIGHT: &str = "
@@ -244,4 +246,19 @@ pub const UPSERT_SPORT_ACTIVITY: &str = "
     ON CONFLICT (user_id, timestamp, sport_key) DO
     UPDATE SET
         sets = ?4
+";
+
+pub const SELECT_SPORT_ACTIVITY_REPORT: &str = "
+    SELECT sa.timestamp, s.name as sport_name, sa.sets
+    FROM
+        sport_activity sa,
+        sport s
+    WHERE
+        sa.sport_key = s.key AND
+        user_id = ?1 AND
+        timestamp >= ?2 AND
+        timestamp <= ?3
+    ORDER BY
+        sa.timestamp,
+        s.name
 ";

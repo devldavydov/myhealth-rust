@@ -4,7 +4,9 @@ use std::sync::Mutex;
 
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
-use model::{backup::Backup, Bundle, Food, Sport, SportActivity, UserSettings, Weight};
+use model::{
+    backup::Backup, Bundle, Food, Sport, SportActivity, SportActivityReport, UserSettings, Weight,
+};
 use rusqlite::{
     functions::FunctionFlags, params, types::Value, Connection, Error::SqliteFailure, Params,
 };
@@ -408,7 +410,8 @@ impl Storage for StorageSqlite {
         ensure!(act.validate(), StorageError::InvalidSportActivity);
 
         // Convert sets to JSON array
-        let str_sets = serde_json::to_string(&json!(act.sets)).context("convert sport activity sets to JSON")?;
+        let str_sets = serde_json::to_string(&json!(act.sets))
+            .context("convert sport activity sets to JSON")?;
 
         match self.raw_execute(
             queries::UPSERT_SPORT_ACTIVITY,
@@ -437,6 +440,37 @@ impl Storage for StorageSqlite {
             }
             _ => Ok(()),
         }
+    }
+
+    fn get_sport_activity_report(
+        &self,
+        user_id: i64,
+        from: Timestamp,
+        to: Timestamp,
+    ) -> Result<Vec<SportActivityReport>> {
+        let db_res = self
+            .raw_query(
+                queries::SELECT_SPORT_ACTIVITY_REPORT,
+                params![user_id, from.unix_millis(), to.unix_millis()],
+            )
+            .context("sport activity report query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+
+        let mut res = Vec::with_capacity(db_res.len());
+        for row in &db_res {
+            let json_sets = Self::get_string(row, "sets").context("get sets field")?;
+            let sets: Vec<i64> =
+                serde_json::from_str(&json_sets).context("convert sets from JSON")?;
+
+            res.push(SportActivityReport {
+                sport_name: Self::get_string(row, "sport_name").context("get sport name field")?,
+                timestamp: Self::get_timestamp(row, "timestamp").context("get timestamp field")?,
+                sets,
+            });
+        }
+
+        Ok(res)
     }
 
     //
@@ -1280,6 +1314,87 @@ mod test {
         assert_eq!(
             String::from("[1,2,3]"),
             StorageSqlite::get_string(res.first().unwrap(), "sets").unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_sport_activity_report() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get empty report
+        let res = stg.get_sport_activity_report(
+            1,
+            Timestamp::from_unix_millis(1).unwrap(),
+            Timestamp::from_unix_millis(2).unwrap(),
+        );
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        // Set data
+        stg.set_sport(&Sport {
+            key: "sport1".into(),
+            name: "Sport 1".into(),
+            comment: "".into(),
+        })?;
+        stg.set_sport(&Sport {
+            key: "sport2".into(),
+            name: "Sport 2".into(),
+            comment: "".into(),
+        })?;
+
+        stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "sport2".into(),
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sets: vec![1],
+            },
+        )?;
+        stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "sport1".into(),
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sets: vec![1, 2],
+            },
+        )?;
+        stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "sport1".into(),
+                timestamp: Timestamp::from_unix_millis(3).unwrap(),
+                sets: vec![1, 2, 3],
+            },
+        )?;
+
+        // Get report
+        let res = stg.get_sport_activity_report(
+            1,
+            Timestamp::from_unix_millis(1).unwrap(),
+            Timestamp::from_unix_millis(3).unwrap(),
+        )?;
+
+        assert_eq!(
+            vec![
+                SportActivityReport {
+                    sport_name: "Sport 1".into(),
+                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                    sets: vec![1, 2],
+                },
+                SportActivityReport {
+                    sport_name: "Sport 2".into(),
+                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                    sets: vec![1],
+                },
+                SportActivityReport {
+                    sport_name: "Sport 1".into(),
+                    timestamp: Timestamp::from_unix_millis(3).unwrap(),
+                    sets: vec![1, 2, 3],
+                }
+            ],
+            res
         );
 
         Ok(())

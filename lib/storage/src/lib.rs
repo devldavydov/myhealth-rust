@@ -1,5 +1,7 @@
 use anyhow::Result;
-use model::{backup::Backup, Bundle, Food, Sport, SportActivity, UserSettings, Weight};
+use model::{
+    backup::Backup, Bundle, Food, Sport, SportActivity, SportActivityReport, UserSettings, Weight,
+};
 use thiserror::Error;
 use types::timestamp::Timestamp;
 
@@ -32,6 +34,12 @@ pub trait Storage: Send + Sync {
     fn delete_sport(&self, key: &str) -> Result<()>;
     // SportActivity
     fn set_sport_activity(&self, user_id: i64, act: &SportActivity) -> Result<()>;
+    fn get_sport_activity_report(
+        &self,
+        user_id: i64,
+        from: Timestamp,
+        to: Timestamp,
+    ) -> Result<Vec<SportActivityReport>>;
     // Backup/Restore
     fn restore(&self, backup: &Backup) -> Result<()>;
     // Error
