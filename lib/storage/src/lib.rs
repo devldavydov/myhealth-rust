@@ -75,6 +75,8 @@ pub enum StorageError {
     InvalidFood,
     #[error("invalid sport")]
     InvalidSport,
+    #[error("sport is used in activity")]
+    SportIsUsedViolation,
     #[error("invalid sport activity")]
     InvalidSportActivity,
 }

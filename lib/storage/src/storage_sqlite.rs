@@ -398,8 +398,27 @@ impl Storage for StorageSqlite {
     }
 
     fn delete_sport(&self, key: &str) -> Result<()> {
-        self.raw_execute(queries::DELETE_SPORT, false, params![key])
+        match self
+            .raw_execute(queries::DELETE_SPORT, false, params![key])
             .context("exec delete sport")
+        {
+            Err(err) => {
+                for cause in err.chain() {
+                    if let Some(SqliteFailure(_, Some(val))) =
+                        cause.downcast_ref::<rusqlite::Error>()
+                    {
+                        if val == "FOREIGN KEY constraint failed" {
+                            bail!(StorageError::SportIsUsedViolation)
+                        };
+
+                        bail!(err);
+                    }
+                }
+
+                bail!(err);
+            }
+            _ => Ok(()),
+        }
     }
 
     //
@@ -1460,6 +1479,34 @@ mod test {
             Timestamp::from_unix_millis(2).unwrap(),
         );
         assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete_sport_with_activity() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set data
+        stg.set_sport(&Sport {
+            key: "sport1".into(),
+            name: "Sport 1".into(),
+            comment: "".into(),
+        })?;
+
+        stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "sport1".into(),
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sets: vec![1],
+            },
+        )?;
+
+        // Delet sport
+        let res = stg.delete_sport("sport1");
+        assert!(stg.is_storage_error(StorageError::SportIsUsedViolation, &res.unwrap_err()));
 
         Ok(())
     }

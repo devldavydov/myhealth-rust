@@ -11,7 +11,7 @@ use storage::{Storage, StorageError};
 use teloxide::{prelude::*, types::InputFile};
 
 use crate::{
-    messages::{ERR_EMPTY, ERR_INTERNAL, ERR_SPORT_NOT_FOUND, ERR_WRONG_COMMAND, OK},
+    messages::{ERR_EMPTY, ERR_INTERNAL, ERR_SPORT_IS_USED, ERR_SPORT_NOT_FOUND, ERR_WRONG_COMMAND, OK},
     HandlerResult,
 };
 
@@ -180,8 +180,11 @@ async fn sport_del(
     // Call storage
     if let Err(err) = stg.delete_sport(args.first().unwrap()) {
         log::error!("del sport error: {err}");
-        // TODO: if activity violation
-        bot.send_message(chat_id, ERR_INTERNAL).await?;
+        if stg.is_storage_error(StorageError::SportIsUsedViolation, &err) {
+            bot.send_message(chat_id, ERR_SPORT_IS_USED).await?;
+        } else {
+            bot.send_message(chat_id, ERR_INTERNAL).await?;
+        }
         return Ok(());
     };
 
