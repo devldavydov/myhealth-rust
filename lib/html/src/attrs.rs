@@ -31,7 +31,7 @@ impl fmt::Display for Attrs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut s = Vec::with_capacity(self.0.len());
         for (k, v) in &self.0 {
-            s.push(format!("{}={}", k, v));
+            s.push(format!("{}=\"{}\"", k, v));
         }
 
         f.write_str(&s.join(" "))

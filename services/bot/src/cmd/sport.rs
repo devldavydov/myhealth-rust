@@ -7,7 +7,7 @@ use html::{
     table::{Table, Td, Tr},
 };
 use model::{Sport, SportActivity};
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use storage::{Storage, StorageError};
 use teloxide::{prelude::*, types::InputFile};
 
@@ -18,7 +18,7 @@ use crate::{
     HandlerResult,
 };
 
-use super::parse_timestamp;
+use super::{format_timestamp, parse_timestamp};
 
 pub async fn process_sport_command(
     bot: Bot,
@@ -54,6 +54,9 @@ pub async fn process_sport_command(
         }
         "ad" => {
             sport_activity_del(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
+        }
+        "ar" => {
+            sport_activity_report(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
         }
         _ => {
             log::error!("unknown command");
@@ -298,12 +301,122 @@ async fn sport_activity_del(
 
     // Call storage
     if let Err(err) = stg.delete_sport_activity(user_id, timestamp, &sport_key) {
-        log::error!("set sport activity error: {err}");
+        log::error!("del sport activity error: {err}");
         bot.send_message(chat_id, ERR_INTERNAL).await?;
         return Ok(());
     }
 
     bot.send_message(chat_id, OK).await?;
+
+    Ok(())
+}
+
+async fn sport_activity_report(
+    bot: Bot,
+    user_id: i64,
+    chat_id: ChatId,
+    args: Vec<&str>,
+    stg: Arc<Box<dyn Storage>>,
+    tz: Tz,
+) -> HandlerResult {
+    if args.len() != 2 {
+        log::error!("wrong args count");
+        bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+        return Ok(());
+    }
+
+    // Parse args
+    let ts_from = match parse_timestamp(args.first().unwrap(), tz) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("parse timestamp from error: {err}");
+            bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+            return Ok(());
+        }
+    };
+
+    let ts_to = match parse_timestamp(args.get(1).unwrap(), tz) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("parse timestamp to error: {err}");
+            bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+            return Ok(());
+        }
+    };
+
+    // Call storage
+    let db_res = match stg.get_sport_activity_report(user_id, ts_from.clone(), ts_to.clone()) {
+        Ok(res) => res,
+        Err(err) => {
+            log::error!("set sport activity error: {err}");
+            if stg.is_storage_error(StorageError::EmptyList, &err) {
+                bot.send_message(chat_id, ERR_EMPTY).await?;
+            } else {
+                bot.send_message(chat_id, ERR_INTERNAL).await?;
+            }
+            return Ok(());
+        }
+    };
+
+    // Generate HTML
+    let ts_from = format_timestamp(&ts_from, "%d.%m.%Y", tz);
+    let ts_to = format_timestamp(&ts_to, "%d.%m.%Y", tz);
+
+    let mut doc = html::Builder::new("Спортивная активность за период");
+    let mut tbl = Table::new(vec!["Дата".into(), "Спорт".into(), "Подходы".into()]);
+
+    let mut grouped_data: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+    for sa in db_res {
+        let ts = format_timestamp(&sa.timestamp, "%d.%m.%Y", tz);
+        let entry = grouped_data.entry(ts).or_default();
+        entry.push((
+            sa.sport_name,
+            sa.sets
+                .iter()
+                .map(|f| f.to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+        ));
+    }
+
+    for item in grouped_data {
+        let mut first = true;
+        let len = item.1.len().to_string();
+        for row in item.1 {
+            let mut tr = Tr::new();
+
+            if first {
+                tr = tr.add_td(
+                    Td::new(S::create(&item.0))
+                        .set_attrs(Attrs::from_items(vec![("rowspan", &len[..])].into_iter())),
+                );
+                first = false;
+            }
+
+            tbl.add_row(
+                tr.add_td(Td::new(S::create(&row.0)))
+                    .add_td(Td::new(S::create(&row.1))),
+            );
+        }
+    }
+
+    doc = doc.add_element(Box::new(
+        Div::new_container()
+            .add_element(Box::new(
+                H::new(
+                    &format!("Спортивная активность за {} - {}", &ts_from, &ts_to),
+                    5,
+                )
+                .set_attr(Attrs::from_items(vec![("align", "center")].into_iter())),
+            ))
+            .add_element(Box::new(tbl)),
+    ));
+
+    bot.send_document(
+        chat_id,
+        InputFile::memory(doc.build()).file_name(format!("sport_act_{}_{}.html", &ts_from, &ts_to)),
+    )
+    .await?;
 
     Ok(())
 }
