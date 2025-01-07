@@ -86,6 +86,7 @@ pub async fn process_command(
                             msg.chat.id,
                             parts[1..].to_vec(),
                             stg,
+                            tz,
                         )
                         .await?;
                     }
