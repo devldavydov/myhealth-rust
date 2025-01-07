@@ -442,6 +442,20 @@ impl Storage for StorageSqlite {
         }
     }
 
+    fn delete_sport_activity(
+        &self,
+        user_id: i64,
+        timestamp: Timestamp,
+        sport_key: &str,
+    ) -> Result<()> {
+        self.raw_execute(
+            queries::DELETE_SPORT_ACTIVITY,
+            false,
+            params![user_id, timestamp.unix_millis(), sport_key],
+        )
+        .context("exec delete sport activity")
+    }
+
     fn get_sport_activity_report(
         &self,
         user_id: i64,
@@ -1320,7 +1334,7 @@ mod test {
     }
 
     #[test]
-    fn get_sport_activity_report() -> Result<()> {
+    fn test_get_sport_activity_report() -> Result<()> {
         let db_file = NamedTempFile::new()?;
         let stg = StorageSqlite::new(db_file.path())?;
 
@@ -1396,6 +1410,56 @@ mod test {
             ],
             res
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_delete_sport_activity() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set data
+        stg.set_sport(&Sport {
+            key: "sport1".into(),
+            name: "Sport 1".into(),
+            comment: "".into(),
+        })?;
+
+        stg.set_sport_activity(
+            1,
+            &SportActivity {
+                sport_key: "sport1".into(),
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sets: vec![1],
+            },
+        )?;
+
+        // Check sport activity report
+        let res = stg.get_sport_activity_report(
+            1,
+            Timestamp::from_unix_millis(1).unwrap(),
+            Timestamp::from_unix_millis(3).unwrap(),
+        )?;
+        assert_eq!(
+            vec![SportActivityReport {
+                sport_name: "Sport 1".into(),
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sets: vec![1],
+            }],
+            res
+        );
+
+        // Delete sport activity
+        stg.delete_sport_activity(1, Timestamp::from_unix_millis(1).unwrap(), "sport1")?;
+
+        // Check empty report
+        let res = stg.get_sport_activity_report(
+            1,
+            Timestamp::from_unix_millis(1).unwrap(),
+            Timestamp::from_unix_millis(2).unwrap(),
+        );
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
 
         Ok(())
     }

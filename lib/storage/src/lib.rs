@@ -14,34 +14,48 @@ pub trait Storage: Send + Sync {
     fn set_food(&self, food: &Food) -> Result<()>;
     fn find_food(&self, pattern: &str) -> Result<Vec<Food>>;
     fn delete_food(&self, key: &str) -> Result<()>;
+
     // Bundle
     fn get_bundle(&self, user_id: i64, key: &str) -> Result<Bundle>;
     fn get_bundle_list(&self, user_id: i64) -> Result<Vec<Bundle>>;
     fn set_bundle(&self, user_id: i64, bndl: &Bundle) -> Result<()>;
     fn delete_bundle(&self, user_id: i64, key: &str) -> Result<()>;
+
     // Weight
     fn get_weight_list(&self, user_id: i64, from: Timestamp, to: Timestamp) -> Result<Vec<Weight>>;
     fn set_weight(&self, user_id: i64, weight: &Weight) -> Result<()>;
     fn delete_weight(&self, user_id: i64, timestamp: Timestamp) -> Result<()>;
+
     // Journal
+
     // UserSettings
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings>;
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()>;
+
     // Sport
     fn get_sport(&self, key: &str) -> Result<Sport>;
     fn get_sport_list(&self) -> Result<Vec<Sport>>;
     fn set_sport(&self, sport: &Sport) -> Result<()>;
     fn delete_sport(&self, key: &str) -> Result<()>;
+
     // SportActivity
     fn set_sport_activity(&self, user_id: i64, act: &SportActivity) -> Result<()>;
+    fn delete_sport_activity(
+        &self,
+        user_id: i64,
+        timestamp: Timestamp,
+        sport_key: &str,
+    ) -> Result<()>;
     fn get_sport_activity_report(
         &self,
         user_id: i64,
         from: Timestamp,
         to: Timestamp,
     ) -> Result<Vec<SportActivityReport>>;
+
     // Backup/Restore
     fn restore(&self, backup: &Backup) -> Result<()>;
+
     // Error
     fn is_storage_error(&self, stg_err: StorageError, err: &anyhow::Error) -> bool;
 }

@@ -262,3 +262,11 @@ pub const SELECT_SPORT_ACTIVITY_REPORT: &str = "
         sa.timestamp,
         s.name
 ";
+
+pub const DELETE_SPORT_ACTIVITY: &str = "
+    DELETE FROM sport_activity
+    WHERE
+        user_id = ?1 AND
+        timestamp = ?2 AND
+        sport_key = ?3
+";
