@@ -363,20 +363,30 @@ async fn sport_activity_report(
     let ts_to = format_timestamp(&ts_to, "%d.%m.%Y", tz);
 
     let mut doc = html::Builder::new("Спортивная активность за период");
-    let mut tbl = Table::new(vec!["Дата".into(), "Спорт".into(), "Подходы".into()]);
+    let mut tbl = Table::new(vec![
+        "Дата".into(),
+        "Спорт".into(),
+        "Подходы".into(),
+        "Итого".into(),
+    ]);
 
-    let mut grouped_data: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
+    let mut grouped_data: BTreeMap<String, Vec<(String, String, i64)>> = BTreeMap::new();
     for sa in db_res {
         let ts = format_timestamp(&sa.timestamp, "%d.%m.%Y", tz);
         let entry = grouped_data.entry(ts).or_default();
-        entry.push((
-            sa.sport_name,
-            sa.sets
-                .iter()
-                .map(|f| f.to_string())
-                .collect::<Vec<String>>()
-                .join(", "),
-        ));
+
+        let mut total = 0;
+        let sets = sa
+            .sets
+            .iter()
+            .map(|f| {
+                total += f;
+                f.to_string()
+            })
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        entry.push((sa.sport_name, sets, total));
     }
 
     for item in grouped_data {
@@ -395,7 +405,8 @@ async fn sport_activity_report(
 
             tbl.add_row(
                 tr.add_td(Td::new(S::create(&row.0)))
-                    .add_td(Td::new(S::create(&row.1))),
+                    .add_td(Td::new(S::create(&row.1)))
+                    .add_td(Td::new(S::create(&row.2.to_string()))),
             );
         }
     }
