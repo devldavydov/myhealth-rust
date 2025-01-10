@@ -87,7 +87,7 @@ async fn user_settings_get(
             }
         }
         Ok(us) => {
-            bot.send_message(chat_id, format!("<b>Лимит калорий:<b> {}", us.cal_limit))
+            bot.send_message(chat_id, format!("<b>Лимит калорий:</b> {}", us.cal_limit))
                 .parse_mode(ParseMode::Html)
                 .await?;
         }
