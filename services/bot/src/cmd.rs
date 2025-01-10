@@ -62,6 +62,7 @@ pub async fn process_command(
                     "u" => {
                         user_settings::process_user_settings_command(
                             bot,
+                            user_id,
                             msg.chat.id,
                             parts[1..].to_vec(),
                             stg,

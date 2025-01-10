@@ -340,11 +340,28 @@ impl Storage for StorageSqlite {
     //
 
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings> {
-        todo!()
+        let db_res = self
+            .raw_query(queries::SELECT_USER_SETTINGS, params![user_id])
+            .context("get user settings query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::NotFound);
+
+        let row = db_res.first().unwrap();
+
+        Ok(UserSettings {
+            cal_limit: Self::get_float(row, "cal_limit").context("get cal_limit field")?,
+        })
     }
 
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()> {
-        todo!()
+        ensure!(settings.validate(), StorageError::InvalidUserSettings);
+
+        self.raw_execute(
+            queries::UPSERT_USER_SETTINGS,
+            false,
+            params![user_id, settings.cal_limit],
+        )
+        .context("exec upsert user settings")
     }
 
     //
@@ -563,7 +580,7 @@ mod test {
         let db_file = NamedTempFile::new()?;
         let stg = StorageSqlite::new(db_file.path())?;
 
-        assert_eq!(4, stg.get_last_migration_id().unwrap());
+        assert_eq!(5, stg.get_last_migration_id().unwrap());
 
         Ok(())
     }
@@ -1507,6 +1524,80 @@ mod test {
         // Delet sport
         let res = stg.delete_sport("sport1");
         assert!(stg.is_storage_error(StorageError::SportIsUsedViolation, &res.unwrap_err()));
+
+        Ok(())
+    }
+
+    //
+    // User settings
+    //
+
+    #[test]
+    fn set_user_settings() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Set invalid user settings
+        let res = stg.set_user_settings(1, &UserSettings { cal_limit: 0.0 });
+        assert!(stg.is_storage_error(StorageError::InvalidUserSettings, &res.unwrap_err()));
+
+        // Set user settings
+        stg.set_user_settings(1, &UserSettings { cal_limit: 100.0 })?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT cal_limit
+            FROM user_settings
+            WHERE user_id = 1
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            100.0,
+            StorageSqlite::get_float(res.first().unwrap(), "cal_limit").unwrap()
+        );
+
+        // Upser user settings
+        stg.set_user_settings(1, &UserSettings { cal_limit: 200.0 })?;
+
+        // Check in DB
+        let res = stg.raw_query(
+            r#"
+            SELECT cal_limit
+            FROM user_settings
+            WHERE user_id = 1
+        "#,
+            params![],
+        )?;
+
+        assert_eq!(1, res.len());
+        assert_eq!(
+            200.0,
+            StorageSqlite::get_float(res.first().unwrap(), "cal_limit").unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn get_user_settings() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get settings that not exists
+        let res = stg.get_user_settings(1);
+        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+
+        // Set settings
+        let s = UserSettings { cal_limit: 200.0 };
+        stg.set_user_settings(1, &s)?;
+
+        // Get settings
+        let res = stg.get_user_settings(1)?;
+        assert_eq!(s, res);
 
         Ok(())
     }

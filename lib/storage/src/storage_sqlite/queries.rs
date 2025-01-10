@@ -182,6 +182,22 @@ pub const CREATE_TABLE_USER_SETTINGS: &str = "
     )
 ";
 
+pub const SELECT_USER_SETTINGS: &str = "
+    SELECT cal_limit
+    FROM user_settings
+    WHERE user_id = ?1
+";
+
+pub const UPSERT_USER_SETTINGS: &str = "
+    INSERT INTO user_settings (
+        user_id, cal_limit
+    )
+    VALUES (?1, ?2)
+    ON CONFLICT (user_id) DO
+    UPDATE SET
+        cal_limit = ?2
+";
+
 //
 // Sport
 //

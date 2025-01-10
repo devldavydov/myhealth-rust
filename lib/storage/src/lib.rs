@@ -79,4 +79,6 @@ pub enum StorageError {
     SportIsUsedViolation,
     #[error("invalid sport activity")]
     InvalidSportActivity,
+    #[error("invalid user settings")]
+    InvalidUserSettings,
 }

@@ -38,6 +38,7 @@ pub struct Journal {
     pub food_weight: f64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct UserSettings {
     pub cal_limit: f64,
 }
