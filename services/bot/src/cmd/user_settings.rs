@@ -1,7 +1,7 @@
 use model::UserSettings;
 use std::sync::Arc;
 use storage::{Storage, StorageError};
-use teloxide::prelude::*;
+use teloxide::{prelude::*, types::ParseMode};
 
 use crate::{
     messages::{ERR_INTERNAL, ERR_USER_SETTINGS_NOT_FOUND, ERR_WRONG_COMMAND, OK},
@@ -87,7 +87,8 @@ async fn user_settings_get(
             }
         }
         Ok(us) => {
-            bot.send_message(chat_id, format!("<b>Лимит калорий: <b>{}", us.cal_limit))
+            bot.send_message(chat_id, format!("<b>Лимит калорий:<b> {}", us.cal_limit))
+                .parse_mode(ParseMode::Html)
                 .await?;
         }
     };
