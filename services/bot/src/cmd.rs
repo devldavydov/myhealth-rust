@@ -1,4 +1,5 @@
 mod bundle;
+mod cal_calc;
 mod food;
 mod journal;
 mod sport;
@@ -90,6 +91,10 @@ pub async fn process_command(
                             tz,
                         )
                         .await?;
+                    }
+                    "cc" => {
+                        cal_calc::process_cal_calc_command(bot, msg.chat.id, parts[1..].to_vec())
+                            .await?;
                     }
                     _ => {
                         log::error!("unknown command");
