@@ -81,4 +81,6 @@ pub enum StorageError {
     InvalidSportActivity,
     #[error("invalid user settings")]
     InvalidUserSettings,
+    #[error("invalid bundle")]
+    InvalidBundle,
 }

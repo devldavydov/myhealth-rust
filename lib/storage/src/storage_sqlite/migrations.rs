@@ -40,6 +40,7 @@ fn get_all_migrations() -> Migrations {
         (3, create_table_sport),
         (4, create_table_sport_activity),
         (5, create_table_user_settings),
+        (6, create_table_bundle),
     ]
 }
 
@@ -75,6 +76,13 @@ fn create_table_sport_activity(tx: &Transaction) -> Result<()> {
 fn create_table_user_settings(tx: &Transaction) -> Result<()> {
     tx.execute(queries::CREATE_TABLE_USER_SETTINGS, [])
         .context("exec create table user settings")?;
+
+    Ok(())
+}
+
+fn create_table_bundle(tx: &Transaction) -> Result<()> {
+    tx.execute(queries::CREATE_TABLE_BUNDLE, [])
+        .context("exec create table bundle")?;
 
     Ok(())
 }

@@ -274,11 +274,44 @@ impl Storage for StorageSqlite {
     //
 
     fn get_bundle(&self, user_id: i64, key: &str) -> Result<Bundle> {
-        todo!()
+        let db_res = self
+            .raw_query(queries::SELECT_BUNDLE, params![user_id, key])
+            .context("get bundle query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::NotFound);
+
+        let row = db_res.first().unwrap();
+
+        let json_data = Self::get_string(row, "data").context("get bundle data field")?;
+        let data: HashMap<String, f64> =
+            serde_json::from_str(&json_data).context("convert bundle data from JSON")?;
+
+        Ok(Bundle {
+            key: Self::get_string(row, "key").context("get bundle key field")?,
+            data,
+        })
     }
 
     fn get_bundle_list(&self, user_id: i64) -> Result<Vec<Bundle>> {
-        todo!()
+        let db_res = self
+            .raw_query(queries::SELECT_BUNDLE_LIST, params![user_id])
+            .context("get bundle list query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+
+        let mut res = Vec::with_capacity(db_res.len());
+        for row in &db_res {
+            let json_data = Self::get_string(row, "data").context("get bundle data field")?;
+            let data: HashMap<String, f64> =
+                serde_json::from_str(&json_data).context("convert bundle data from JSON")?;
+
+            res.push(Bundle {
+                key: Self::get_string(row, "key").context("get bundle key field")?,
+                data,
+            });
+        }
+
+        Ok(res)
     }
 
     fn set_bundle(&self, user_id: i64, bndl: &Bundle) -> Result<()> {
@@ -552,9 +585,7 @@ impl Storage for StorageSqlite {
             self.raw_execute(
                 queries::UPSERT_USER_SETTINGS,
                 false,
-                params![
-                    us.user_id, us.cal_limit
-                ],
+                params![us.user_id, us.cal_limit],
             )
             .context("exec upsert backup user settings")?;
         }
@@ -593,7 +624,7 @@ mod test {
         let db_file = NamedTempFile::new()?;
         let stg = StorageSqlite::new(db_file.path())?;
 
-        assert_eq!(5, stg.get_last_migration_id().unwrap());
+        assert_eq!(6, stg.get_last_migration_id().unwrap());
 
         Ok(())
     }
@@ -1616,6 +1647,85 @@ mod test {
     }
 
     //
+    // Bundle
+    //
+
+    #[test]
+    fn test_get_bundle() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get not existing bundle
+        let res = stg.get_bundle(1, "test");
+        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+
+        // Add bundle to DB
+        stg.raw_execute(
+            r#"
+            INSERT INTO bundle(user_id, key, data)
+            VALUES 
+                (1, 'test', '{"bundle1": 0, "food1": 1.1}')
+            ;
+        "#,
+            false,
+            params![],
+        )?;
+
+        // Get bundle
+        let res = stg.get_bundle(1, "test")?;
+        assert_eq!(
+            Bundle {
+                key: "test".into(),
+                data: HashMap::from([("bundle1".into(), 0.0), ("food1".into(), 1.1)]),
+            },
+            res
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_bundle_list() -> Result<()> {
+        let db_file = NamedTempFile::new()?;
+        let stg = StorageSqlite::new(db_file.path())?;
+
+        // Get empty bundle list
+        let res = stg.get_bundle_list(1);
+        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+        // Add bundle to DB
+        stg.raw_execute(
+            r#"
+            INSERT INTO bundle(user_id, key, data)
+            VALUES 
+                (1, 'test', '{"bundle1": 0, "food1": 1.1}'),
+                (1, 'test2', '{"bundle2": 0}')
+            ;
+        "#,
+            false,
+            params![],
+        )?;
+
+        // Get bundle list
+        let res = stg.get_bundle_list(1)?;
+        assert_eq!(
+            vec![
+                Bundle {
+                    key: "test".into(),
+                    data: HashMap::from([("bundle1".into(), 0.0), ("food1".into(), 1.1)]),
+                },
+                Bundle {
+                    key: "test2".into(),
+                    data: HashMap::from([("bundle2".into(), 0.0)]),
+                }
+            ],
+            res
+        );
+
+        Ok(())
+    }
+
+    //
     // Restore/backup
     //
 
@@ -1692,8 +1802,14 @@ mod test {
                 },
             ],
             user_settings: vec![
-                UserSettingsBackup{user_id: 1, cal_limit: 1.0},
-                UserSettingsBackup{user_id: 2, cal_limit: 2.0}
+                UserSettingsBackup {
+                    user_id: 1,
+                    cal_limit: 1.0,
+                },
+                UserSettingsBackup {
+                    user_id: 2,
+                    cal_limit: 2.0,
+                },
             ],
         })?;
 

@@ -43,6 +43,7 @@ pub struct UserSettings {
     pub cal_limit: f64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bundle {
     pub key: String,
     // Map of bundle data

@@ -145,30 +145,33 @@ pub const CREATE_TABLE_JOURNAL: &str = "
 pub const CREATE_TABLE_BUNDLE: &str = "
     CREATE TABLE bundle (
         user_id    INTEGER NOT NULL,
-        key        TEXT    NOT NULL,        
+        key        TEXT    NOT NULL, 
+        data       TEXT    NOT NULL,  
         PRIMARY KEY (user_id, key)
     )
 ";
 
-pub const CREATE_TABLE_BUNDLE_FOOD_ITEMS: &str = "
-    CREATE TABLE bundle_food_items (
-        bundle_key  INTEGER NOT NULL,
-        food_key    INTEGER NOT NULL,
-        food_weight REAL    NOT NULL,
-        PRIMARY KEY (bundle_key, food_key),
-        FOREIGN KEY (bundle_key) REFERENCES bundle(key) ON DELETE RESTRICT,
-        FOREIGN KEY (food_key) REFERENCES food(key) ON DELETE RESTRICT
-    )
+pub const SELECT_BUNDLE: &str = "
+    SELECT key, data
+    FROM bundle
+    WHERE user_id = ?1 AND key = ?2
 ";
 
-pub const CREATE_TABLE_BUNDLE_BUNDLE_ITEMS: &str = "
-    CREATE TABLE bundle_bundle_items (
-        bundle_key       INTEGER NOT NULL,
-        child_bundle_key INTEGER NOT NULL,
-        PRIMARY KEY (bundle_key, child_bundle_key),
-        FOREIGN KEY (bundle_key) REFERENCES bundle(key) ON DELETE RESTRICT,
-        FOREIGN KEY (child_bundle_key) REFERENCES bundle(key) ON DELETE RESTRICT
+pub const SELECT_BUNDLE_LIST: &str = "
+    SELECT key, data
+    FROM bundle
+    WHERE user_id = ?1
+    ORDER by key
+";
+
+pub const UPSERT_BUNDLE: &str = "
+    INSERT INTO bundle (
+        user_id, key, data
     )
+    VALUES (?1, ?2, ?3)
+    ON CONFLICT (user_id, key) DO
+    UPDATE SET
+        data = ?3
 ";
 
 //
