@@ -534,7 +534,7 @@ impl Storage for StorageSqlite {
                 false,
                 params![w.user_id, w.timestamp, w.value],
             )
-            .context("upsert backup weight query")?;
+            .context("exec upsert backup weight")?;
         }
 
         for f in &backup.food {
@@ -545,7 +545,18 @@ impl Storage for StorageSqlite {
                     f.key, f.name, f.brand, f.cal100, f.prot100, f.fat100, f.carb100, f.comment
                 ],
             )
-            .context("upsert backup food query")?;
+            .context("exec upsert backup food")?;
+        }
+
+        for us in &backup.user_settings {
+            self.raw_execute(
+                queries::UPSERT_USER_SETTINGS,
+                false,
+                params![
+                    us.user_id, us.cal_limit
+                ],
+            )
+            .context("exec upsert backup user settings")?;
         }
 
         Ok(())
@@ -566,9 +577,11 @@ impl Storage for StorageSqlite {
 
 #[cfg(test)]
 mod test {
+    use std::vec;
+
     use super::*;
     use anyhow::Result;
-    use model::backup::{FoodBackup, WeightBackup};
+    use model::backup::{FoodBackup, UserSettingsBackup, WeightBackup};
     use tempfile::NamedTempFile;
 
     //
@@ -1678,6 +1691,10 @@ mod test {
                     comment: "Комментарий 3".into(),
                 },
             ],
+            user_settings: vec![
+                UserSettingsBackup{user_id: 1, cal_limit: 1.0},
+                UserSettingsBackup{user_id: 2, cal_limit: 2.0}
+            ],
         })?;
 
         // Check weight list for user 1
@@ -1765,6 +1782,13 @@ mod test {
             ],
             res
         );
+
+        // Check user settings
+        let res = stg.get_user_settings(1)?;
+        assert_eq!(1.0, res.cal_limit);
+
+        let res = stg.get_user_settings(2)?;
+        assert_eq!(2.0, res.cal_limit);
 
         Ok(())
     }
