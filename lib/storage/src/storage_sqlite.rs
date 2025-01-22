@@ -711,6 +711,17 @@ impl Storage for StorageSqlite {
             .context("exec upsert backup user settings")?;
         }
 
+        for b in &backup.bundle {
+            let data =
+                serde_json::to_string(&json!(b.data)).context("convert bundle data to JSON")?;
+            self.raw_execute(
+                queries::UPSERT_BUNDLE,
+                false,
+                params![b.user_id, b.key, data],
+            )
+            .context("exec upsert backup bundle")?;
+        }
+
         Ok(())
     }
 

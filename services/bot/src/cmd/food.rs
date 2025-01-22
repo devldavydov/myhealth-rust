@@ -14,7 +14,9 @@ use teloxide::{
 };
 
 use crate::{
-    messages::{ERR_EMPTY, ERR_FOOD_IS_USED, ERR_FOOD_NOT_FOUND, ERR_INTERNAL, ERR_WRONG_COMMAND, OK},
+    messages::{
+        ERR_EMPTY, ERR_FOOD_IS_USED, ERR_FOOD_NOT_FOUND, ERR_INTERNAL, ERR_WRONG_COMMAND, OK,
+    },
     HandlerResult,
 };
 

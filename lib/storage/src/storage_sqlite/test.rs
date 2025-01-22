@@ -2,7 +2,7 @@ use std::vec;
 
 use super::*;
 use anyhow::Result;
-use model::backup::{FoodBackup, UserSettingsBackup, WeightBackup};
+use model::backup::{BundleBackup, FoodBackup, UserSettingsBackup, WeightBackup};
 use tempfile::NamedTempFile;
 
 //
@@ -1402,6 +1402,18 @@ fn test_restore() -> Result<()> {
                 cal_limit: 2.0,
             },
         ],
+        bundle: vec![
+            BundleBackup {
+                user_id: 1,
+                key: "bundle1".into(),
+                data: HashMap::from([("key1".into(), 100.0)]),
+            },
+            BundleBackup {
+                user_id: 1,
+                key: "bundle2".into(),
+                data: HashMap::from([("key2".into(), 100.0), ("bundle1".into(), 0.0)]),
+            },
+        ],
     })?;
 
     // Check weight list for user 1
@@ -1496,6 +1508,22 @@ fn test_restore() -> Result<()> {
 
     let res = stg.get_user_settings(2)?;
     assert_eq!(2.0, res.cal_limit);
+
+    // Check bundles
+    let res = stg.get_bundle_list(1)?;
+    assert_eq!(
+        vec![
+            Bundle {
+                key: "bundle1".into(),
+                data: HashMap::from([("key1".into(), 100.0)]),
+            },
+            Bundle {
+                key: "bundle2".into(),
+                data: HashMap::from([("key2".into(), 100.0), ("bundle1".into(), 0.0)]),
+            },
+        ],
+        res
+    );
 
     Ok(())
 }
