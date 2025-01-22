@@ -83,4 +83,12 @@ pub enum StorageError {
     InvalidUserSettings,
     #[error("invalid bundle")]
     InvalidBundle,
+    #[error("dependent food not found")]
+    BundleDepFoodNotFound,
+    #[error("dependent bundle not found")]
+    BundleDepBundleNotFound,
+    #[error("dependent recursive bundle not allowed")]
+    BundleDepRecursive,
+    #[error("bundle is used")]
+    BundleIsUsed,
 }

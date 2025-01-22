@@ -9,12 +9,16 @@ use model::{
 };
 use rusqlite::{
     functions::FunctionFlags, params, types::Value, Connection, Error::SqliteFailure, Params,
+    Transaction,
 };
 use serde_json::json;
 use types::timestamp::Timestamp;
 
 mod migrations;
 mod queries;
+
+#[cfg(test)]
+mod test;
 
 pub struct StorageSqlite {
     conn: Mutex<Connection>,
@@ -59,9 +63,57 @@ impl StorageSqlite {
     where
         P: Params,
     {
-        let conn = self.conn.lock().unwrap();
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn
+            .transaction()
+            .context("failed to get transaction")
+            .unwrap();
 
-        let mut stmt = conn.prepare(query).context("prepare raw query")?;
+        // tx when dropped is rollbacked - it's Ok for query
+        Self::raw_query_tx(&tx, query, params)
+    }
+
+    fn raw_execute<P>(&self, query: &str, batch: bool, params: P) -> Result<()>
+    where
+        P: Params,
+    {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn
+            .transaction()
+            .context("failed to get transaction")
+            .unwrap();
+
+        Self::raw_execute_tx(&tx, query, batch, params)?;
+        tx.commit().context("failed to commit transaction")?;
+
+        Ok(())
+    }
+
+    fn get_last_migration_id(&self) -> Result<i64> {
+        let res = self
+            .raw_query(queries::SELECT_MIGRATION_ID, params![])
+            .context("query last migration")?;
+        if res.is_empty() {
+            return Ok(0);
+        }
+
+        let row = res.first().unwrap();
+        if let Some(Value::Integer(val)) = row.get("migration_id") {
+            return Ok(*val);
+        }
+
+        bail!("migration_id not found");
+    }
+
+    fn raw_query_tx<P>(
+        tx: &Transaction,
+        query: &str,
+        params: P,
+    ) -> Result<Vec<HashMap<String, Value>>>
+    where
+        P: Params,
+    {
+        let mut stmt = tx.prepare(query).context("prepare raw query")?;
         let mut rows = stmt.query(params).context("quering raw query")?;
 
         let mut col_names: Vec<String> = Default::default();
@@ -96,36 +148,17 @@ impl StorageSqlite {
         Ok(res)
     }
 
-    fn raw_execute<P>(&self, query: &str, batch: bool, params: P) -> Result<()>
+    fn raw_execute_tx<P>(tx: &Transaction, query: &str, batch: bool, params: P) -> Result<()>
     where
         P: Params,
     {
-        let conn = self.conn.lock().unwrap();
-
         if !batch {
-            conn.execute(query, params).context("raw execute query")?;
+            tx.execute(query, params).context("raw execute query")?;
         } else {
-            conn.execute_batch(query)
-                .context("raw execute batch query")?;
+            tx.execute_batch(query).context("raw execute batch query")?;
         }
 
         Ok(())
-    }
-
-    fn get_last_migration_id(&self) -> Result<i64> {
-        let res = self
-            .raw_query(queries::SELECT_MIGRATION_ID, params![])
-            .context("query last migration")?;
-        if res.is_empty() {
-            return Ok(0);
-        }
-
-        let row = res.first().unwrap();
-        if let Some(Value::Integer(val)) = row.get("migration_id") {
-            return Ok(*val);
-        }
-
-        bail!("migration_id not found");
     }
 
     fn add_custom_functions(conn: &Connection) -> Result<()> {
@@ -315,11 +348,76 @@ impl Storage for StorageSqlite {
     }
 
     fn set_bundle(&self, user_id: i64, bndl: &Bundle) -> Result<()> {
-        todo!()
+        ensure!(bndl.validate(), StorageError::InvalidBundle);
+
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().context("failed to get transaction")?;
+
+        // Check bundle data
+        for (k, v) in &bndl.data {
+            if *v == 0.0 {
+                // Dependent bundle
+                if *k == bndl.key {
+                    bail!(StorageError::BundleDepRecursive)
+                }
+
+                let db_res = Self::raw_query_tx(&tx, queries::SELECT_BUNDLE, params![user_id, k])
+                    .context("get bundle query")?;
+
+                if db_res.is_empty() {
+                    bail!(StorageError::BundleDepBundleNotFound)
+                }
+            } else {
+                // Dependent food
+                let db_res = Self::raw_query_tx(&tx, queries::SELECT_FOOD, params![k])
+                    .context("get food query")?;
+
+                if db_res.is_empty() {
+                    bail!(StorageError::BundleDepFoodNotFound)
+                }
+            }
+        }
+
+        // Set bundle
+        let data =
+            serde_json::to_string(&json!(bndl.data)).context("convert bundle data to JSON")?;
+
+        Self::raw_execute_tx(
+            &tx,
+            queries::UPSERT_BUNDLE,
+            false,
+            params![user_id, bndl.key, data],
+        )?;
+        tx.commit().context("failed to commit transaction")?;
+
+        Ok(())
     }
 
     fn delete_bundle(&self, user_id: i64, key: &str) -> Result<()> {
-        todo!()
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().context("failed to get transaction")?;
+
+        // Check that bundle not used in other bundles
+        let db_res = Self::raw_query_tx(&tx, queries::SELECT_BUNDLE_LIST, params![user_id])
+            .context("get bundle list query")?;
+
+        for row in &db_res {
+            let json_data = Self::get_string(row, "data").context("get bundle data field")?;
+            let data: HashMap<String, f64> =
+                serde_json::from_str(&json_data).context("convert bundle data from JSON")?;
+
+            for (k, v) in &data {
+                if *v == 0.0 && k == key {
+                    bail!(StorageError::BundleIsUsed)
+                }
+            }
+        }
+
+        // Delete bundle
+        Self::raw_execute_tx(&tx, queries::DELETE_BUNDLE, false, params![user_id, key])?;
+        tx.commit().context("failed to commit transaction")?;
+
+        Ok(())
     }
 
     //
@@ -603,1309 +701,5 @@ impl Storage for StorageSqlite {
                 .root_cause()
                 .downcast_ref::<StorageError>()
                 .unwrap_or(&StorageError::default())
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::vec;
-
-    use super::*;
-    use anyhow::Result;
-    use model::backup::{FoodBackup, UserSettingsBackup, WeightBackup};
-    use tempfile::NamedTempFile;
-
-    //
-    // Migrations
-    //
-
-    #[test]
-    fn test_migrations_apply() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        assert_eq!(6, stg.get_last_migration_id().unwrap());
-
-        Ok(())
-    }
-
-    //
-    // Weight
-    //
-
-    #[test]
-    fn test_get_weight_list() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Check EmptyList error
-        let res = stg.get_weight_list(
-            1,
-            Timestamp::from_unix_millis(0).unwrap(),
-            Timestamp::from_unix_millis(10).unwrap(),
-        );
-
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        // Add test data
-        stg.raw_execute(
-            "
-            INSERT INTO weight(user_id, timestamp, value)
-            VALUES 
-                (1, 1, 1.1),
-                (1, 2, 2.2),
-                (1, 3, 3.3),
-                (2, 4, 4.4)
-            ;
-        ",
-            false,
-            params![],
-        )?;
-
-        // Check weight list for user 1
-        let res = stg.get_weight_list(
-            1,
-            Timestamp::from_unix_millis(0).unwrap(),
-            Timestamp::from_unix_millis(10).unwrap(),
-        );
-        assert_eq!(
-            vec![
-                Weight {
-                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                    value: 1.1
-                },
-                Weight {
-                    timestamp: Timestamp::from_unix_millis(2).unwrap(),
-                    value: 2.2
-                },
-                Weight {
-                    timestamp: Timestamp::from_unix_millis(3).unwrap(),
-                    value: 3.3
-                },
-            ],
-            res.unwrap()
-        );
-
-        // Check weight list for user 2
-        let res = stg.get_weight_list(
-            2,
-            Timestamp::from_unix_millis(0).unwrap(),
-            Timestamp::from_unix_millis(10).unwrap(),
-        );
-        assert_eq!(
-            vec![Weight {
-                timestamp: Timestamp::from_unix_millis(4).unwrap(),
-                value: 4.4
-            },],
-            res.unwrap()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_delete_weight() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Add test data
-        stg.raw_execute(
-            "
-            INSERT INTO weight(user_id, timestamp, value)
-            VALUES 
-                (1, 1, 1.1),
-                (2, 4, 4.4)
-            ;
-        ",
-            false,
-            params![],
-        )?;
-
-        // Delete for user 2
-        stg.delete_weight(2, Timestamp::from_unix_millis(4).unwrap())?;
-        let res = stg.get_weight_list(
-            2,
-            Timestamp::from_unix_millis(0).unwrap(),
-            Timestamp::from_unix_millis(10).unwrap(),
-        );
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        // Delete for user 1 record that not exists (timestamp=4)
-        stg.delete_weight(1, Timestamp::from_unix_millis(4).unwrap())?;
-        assert_eq!(
-            1,
-            stg.get_weight_list(
-                1,
-                Timestamp::from_unix_millis(0).unwrap(),
-                Timestamp::from_unix_millis(10).unwrap(),
-            )?
-            .len()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_set_weight() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set invalid weight
-        let res = stg.set_weight(
-            1,
-            &Weight {
-                timestamp: Timestamp::from_unix_millis(1734876557).unwrap(),
-                value: -1.1,
-            },
-        );
-        assert!(stg.is_storage_error(StorageError::InvalidWeight, &res.unwrap_err()));
-
-        // Set weight
-        stg.set_weight(
-            1,
-            &Weight {
-                timestamp: Timestamp::from_unix_millis(1734876557).unwrap(),
-                value: 1.1,
-            },
-        )?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            "SELECT timestamp, value FROM weight WHERE user_id = 1",
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            Timestamp::from_unix_millis(1734876557).unwrap(),
-            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
-        );
-        assert_eq!(
-            1.1,
-            StorageSqlite::get_float(res.first().unwrap(), "value").unwrap()
-        );
-
-        // Update weight
-        stg.set_weight(
-            1,
-            &Weight {
-                timestamp: Timestamp::from_unix_millis(1734876557).unwrap(),
-                value: 2.2,
-            },
-        )?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            "SELECT timestamp, value FROM weight WHERE user_id = 1",
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            Timestamp::from_unix_millis(1734876557).unwrap(),
-            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
-        );
-        assert_eq!(
-            2.2,
-            StorageSqlite::get_float(res.first().unwrap(), "value").unwrap()
-        );
-
-        Ok(())
-    }
-
-    //
-    // Food
-    //
-
-    #[test]
-    fn test_set_food() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set invalid food
-        let res = stg.set_food(&Food {
-            key: "".into(),
-            name: "name".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        });
-        assert!(stg.is_storage_error(StorageError::InvalidFood, &res.unwrap_err()));
-
-        // Set food
-        stg.set_food(&Food {
-            key: "key".into(),
-            name: "name".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        })?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT
-                key, name, brand, cal100,
-                prot100, fat100, carb100, comment
-            FROM food
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            String::from("key"),
-            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
-        );
-        assert_eq!(
-            String::from("name"),
-            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
-        );
-        assert_eq!(
-            String::from("brand"),
-            StorageSqlite::get_string(res.first().unwrap(), "brand").unwrap()
-        );
-        assert_eq!(
-            1.1,
-            StorageSqlite::get_float(res.first().unwrap(), "cal100").unwrap()
-        );
-        assert_eq!(
-            2.2,
-            StorageSqlite::get_float(res.first().unwrap(), "prot100").unwrap()
-        );
-        assert_eq!(
-            3.3,
-            StorageSqlite::get_float(res.first().unwrap(), "fat100").unwrap()
-        );
-        assert_eq!(
-            4.4,
-            StorageSqlite::get_float(res.first().unwrap(), "carb100").unwrap()
-        );
-        assert_eq!(
-            String::from("comment"),
-            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
-        );
-
-        // Update food
-        stg.set_food(&Food {
-            key: "key".into(),
-            name: "name".into(),
-            brand: "".into(),
-            cal100: 5.5,
-            prot100: 6.6,
-            fat100: 7.7,
-            carb100: 8.8,
-            comment: "".into(),
-        })?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT
-                key, name, brand, cal100,
-                prot100, fat100, carb100, comment
-            FROM food
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            String::from("key"),
-            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
-        );
-        assert_eq!(
-            String::from("name"),
-            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
-        );
-        assert_eq!(
-            String::from(""),
-            StorageSqlite::get_string(res.first().unwrap(), "brand").unwrap()
-        );
-        assert_eq!(
-            5.5,
-            StorageSqlite::get_float(res.first().unwrap(), "cal100").unwrap()
-        );
-        assert_eq!(
-            6.6,
-            StorageSqlite::get_float(res.first().unwrap(), "prot100").unwrap()
-        );
-        assert_eq!(
-            7.7,
-            StorageSqlite::get_float(res.first().unwrap(), "fat100").unwrap()
-        );
-        assert_eq!(
-            8.8,
-            StorageSqlite::get_float(res.first().unwrap(), "carb100").unwrap()
-        );
-        assert_eq!(
-            String::from(""),
-            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_food() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get food that not exists
-        let res = stg.get_food("key");
-        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
-
-        // Set food
-        let f = Food {
-            key: "key".into(),
-            name: "name".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        };
-        stg.set_food(&f)?;
-
-        // Get food
-        assert_eq!(f, stg.get_food("key").unwrap());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_food_list() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get empty food list
-        let res = stg.get_food_list();
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        // Set food
-        let f1 = Food {
-            key: "key1".into(),
-            name: "name1".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        };
-        stg.set_food(&f1)?;
-
-        let f2 = Food {
-            key: "key2".into(),
-            name: "name2".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        };
-        stg.set_food(&f2)?;
-
-        // Get food list
-        assert_eq!(vec![f1, f2], stg.get_food_list().unwrap());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_delete_food() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set food
-        let f1 = Food {
-            key: "key1".into(),
-            name: "name1".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        };
-        stg.set_food(&f1)?;
-
-        let f2 = Food {
-            key: "key2".into(),
-            name: "name2".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        };
-        stg.set_food(&f2)?;
-
-        // Get food list
-        assert_eq!(vec![f1, f2.clone()], stg.get_food_list().unwrap());
-
-        // Delete food1
-        stg.delete_food("key1")?;
-
-        // Get food list
-        assert_eq!(vec![f2], stg.get_food_list().unwrap());
-
-        // Delete food2
-        stg.delete_food("key2")?;
-
-        // Get food list
-        let res = stg.get_food_list();
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_find_food() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Find empty result
-        let res = stg.find_food("some food");
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        // Set food
-        let f1 = Food {
-            key: "key1".into(),
-            name: "name1".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        };
-        stg.set_food(&f1)?;
-
-        let f2 = Food {
-            key: "key2".into(),
-            name: "name2".into(),
-            brand: "brand".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "comment".into(),
-        };
-        stg.set_food(&f2)?;
-
-        let f3 = Food {
-            key: "key3".into(),
-            name: "Сырок Дружба".into(),
-            brand: "Вкусвилл".into(),
-            cal100: 1.1,
-            prot100: 2.2,
-            fat100: 3.3,
-            carb100: 4.4,
-            comment: "Вкусный".into(),
-        };
-        stg.set_food(&f3)?;
-
-        // Find food
-        assert_eq!(
-            vec![f1.clone(), f2.clone(), f3.clone()],
-            stg.find_food("kEy").unwrap()
-        );
-        assert_eq!(vec![f2], stg.find_food("NAMe2").unwrap());
-        assert_eq!(vec![f3.clone()], stg.find_food("дружба").unwrap());
-        assert_eq!(vec![f3.clone()], stg.find_food("вкусВиЛЛ").unwrap());
-        assert_eq!(vec![f3.clone()], stg.find_food("нЫЙ").unwrap());
-
-        Ok(())
-    }
-
-    //
-    // Sport
-    //
-
-    #[test]
-    fn test_set_sport() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set invalid sport
-        let res = stg.set_sport(&Sport {
-            key: "".into(),
-            name: "name".into(),
-            comment: "comment".into(),
-        });
-        assert!(stg.is_storage_error(StorageError::InvalidSport, &res.unwrap_err()));
-
-        // Set sport
-        stg.set_sport(&Sport {
-            key: "key".into(),
-            name: "name".into(),
-            comment: "comment".into(),
-        })?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT
-                key, name, comment
-            FROM sport
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            String::from("key"),
-            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
-        );
-        assert_eq!(
-            String::from("name"),
-            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
-        );
-        assert_eq!(
-            String::from("comment"),
-            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
-        );
-
-        // Update sport
-        stg.set_sport(&Sport {
-            key: "key".into(),
-            name: "name".into(),
-            comment: "".into(),
-        })?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT
-                key, name, comment
-            FROM sport
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            String::from("key"),
-            StorageSqlite::get_string(res.first().unwrap(), "key").unwrap()
-        );
-        assert_eq!(
-            String::from("name"),
-            StorageSqlite::get_string(res.first().unwrap(), "name").unwrap()
-        );
-        assert_eq!(
-            String::from(""),
-            StorageSqlite::get_string(res.first().unwrap(), "comment").unwrap()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_sport() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get sport that not exists
-        let res = stg.get_sport("key");
-        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
-
-        // Set sport
-        let s = Sport {
-            key: "key".into(),
-            name: "name".into(),
-            comment: "comment".into(),
-        };
-        stg.set_sport(&s)?;
-
-        // Get sport
-        assert_eq!(s, stg.get_sport("key").unwrap());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_sport_list() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get empty sport list
-        let res = stg.get_sport_list();
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        // Set sport
-        let s1 = Sport {
-            key: "key1".into(),
-            name: "name1".into(),
-            comment: "comment".into(),
-        };
-        stg.set_sport(&s1)?;
-
-        let s2 = Sport {
-            key: "key2".into(),
-            name: "name2".into(),
-            comment: "comment".into(),
-        };
-        stg.set_sport(&s2)?;
-
-        // Get sport list
-        assert_eq!(vec![s1, s2], stg.get_sport_list().unwrap());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_delete_sport() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set sport
-        let s1 = Sport {
-            key: "key1".into(),
-            name: "name1".into(),
-            comment: "comment".into(),
-        };
-        stg.set_sport(&s1)?;
-
-        let s2 = Sport {
-            key: "key2".into(),
-            name: "name2".into(),
-            comment: "comment".into(),
-        };
-        stg.set_sport(&s2)?;
-
-        // Get sport list
-        assert_eq!(vec![s1, s2.clone()], stg.get_sport_list().unwrap());
-
-        // Delete sport1
-        stg.delete_sport("key1")?;
-
-        // Get sport list
-        assert_eq!(vec![s2], stg.get_sport_list().unwrap());
-
-        // Delete sport2
-        stg.delete_sport("key2")?;
-
-        // Get sport list
-        let res = stg.get_sport_list();
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        Ok(())
-    }
-
-    //
-    // Sport activity
-    //
-
-    #[test]
-    fn test_set_sport_activity() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set invalid sport activity
-        let res = stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "test".into(),
-                timestamp: Timestamp::now(),
-                sets: vec![],
-            },
-        );
-        assert!(stg.is_storage_error(StorageError::InvalidSportActivity, &res.unwrap_err()));
-
-        // Set sport activity for sport that not exists
-        let res = stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "test".into(),
-                timestamp: Timestamp::now(),
-                sets: vec![1, 2, 3],
-            },
-        );
-        assert!(stg.is_storage_error(StorageError::InvalidSport, &res.unwrap_err()));
-
-        // Set sport
-        stg.set_sport(&Sport {
-            key: "test".into(),
-            name: "test".into(),
-            comment: "".into(),
-        })?;
-
-        // Set sport activity
-        stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "test".into(),
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                sets: vec![1],
-            },
-        )?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT
-                timestamp, sport_key, sets
-            FROM sport_activity
-            WHERE user_id = 1
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            Timestamp::from_unix_millis(1).unwrap(),
-            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
-        );
-        assert_eq!(
-            String::from("test"),
-            StorageSqlite::get_string(res.first().unwrap(), "sport_key").unwrap()
-        );
-        assert_eq!(
-            String::from("[1]"),
-            StorageSqlite::get_string(res.first().unwrap(), "sets").unwrap()
-        );
-
-        // Update sport activity
-        stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "test".into(),
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                sets: vec![1, 2, 3],
-            },
-        )?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT
-                timestamp, sport_key, sets
-            FROM sport_activity
-            WHERE user_id = 1
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            Timestamp::from_unix_millis(1).unwrap(),
-            StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
-        );
-        assert_eq!(
-            String::from("test"),
-            StorageSqlite::get_string(res.first().unwrap(), "sport_key").unwrap()
-        );
-        assert_eq!(
-            String::from("[1,2,3]"),
-            StorageSqlite::get_string(res.first().unwrap(), "sets").unwrap()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_sport_activity_report() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get empty report
-        let res = stg.get_sport_activity_report(
-            1,
-            Timestamp::from_unix_millis(1).unwrap(),
-            Timestamp::from_unix_millis(2).unwrap(),
-        );
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        // Set data
-        stg.set_sport(&Sport {
-            key: "sport1".into(),
-            name: "Sport 1".into(),
-            comment: "".into(),
-        })?;
-        stg.set_sport(&Sport {
-            key: "sport2".into(),
-            name: "Sport 2".into(),
-            comment: "".into(),
-        })?;
-
-        stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "sport2".into(),
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                sets: vec![1],
-            },
-        )?;
-        stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "sport1".into(),
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                sets: vec![1, 2],
-            },
-        )?;
-        stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "sport1".into(),
-                timestamp: Timestamp::from_unix_millis(3).unwrap(),
-                sets: vec![1, 2, 3],
-            },
-        )?;
-
-        // Get report
-        let res = stg.get_sport_activity_report(
-            1,
-            Timestamp::from_unix_millis(1).unwrap(),
-            Timestamp::from_unix_millis(3).unwrap(),
-        )?;
-
-        assert_eq!(
-            vec![
-                SportActivityReport {
-                    sport_name: "Sport 1".into(),
-                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                    sets: vec![1, 2],
-                },
-                SportActivityReport {
-                    sport_name: "Sport 2".into(),
-                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                    sets: vec![1],
-                },
-                SportActivityReport {
-                    sport_name: "Sport 1".into(),
-                    timestamp: Timestamp::from_unix_millis(3).unwrap(),
-                    sets: vec![1, 2, 3],
-                }
-            ],
-            res
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_delete_sport_activity() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set data
-        stg.set_sport(&Sport {
-            key: "sport1".into(),
-            name: "Sport 1".into(),
-            comment: "".into(),
-        })?;
-
-        stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "sport1".into(),
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                sets: vec![1],
-            },
-        )?;
-
-        // Check sport activity report
-        let res = stg.get_sport_activity_report(
-            1,
-            Timestamp::from_unix_millis(1).unwrap(),
-            Timestamp::from_unix_millis(3).unwrap(),
-        )?;
-        assert_eq!(
-            vec![SportActivityReport {
-                sport_name: "Sport 1".into(),
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                sets: vec![1],
-            }],
-            res
-        );
-
-        // Delete sport activity
-        stg.delete_sport_activity(1, Timestamp::from_unix_millis(1).unwrap(), "sport1")?;
-
-        // Check empty report
-        let res = stg.get_sport_activity_report(
-            1,
-            Timestamp::from_unix_millis(1).unwrap(),
-            Timestamp::from_unix_millis(2).unwrap(),
-        );
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_delete_sport_with_activity() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set data
-        stg.set_sport(&Sport {
-            key: "sport1".into(),
-            name: "Sport 1".into(),
-            comment: "".into(),
-        })?;
-
-        stg.set_sport_activity(
-            1,
-            &SportActivity {
-                sport_key: "sport1".into(),
-                timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                sets: vec![1],
-            },
-        )?;
-
-        // Delet sport
-        let res = stg.delete_sport("sport1");
-        assert!(stg.is_storage_error(StorageError::SportIsUsedViolation, &res.unwrap_err()));
-
-        Ok(())
-    }
-
-    //
-    // User settings
-    //
-
-    #[test]
-    fn set_user_settings() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Set invalid user settings
-        let res = stg.set_user_settings(1, &UserSettings { cal_limit: 0.0 });
-        assert!(stg.is_storage_error(StorageError::InvalidUserSettings, &res.unwrap_err()));
-
-        // Set user settings
-        stg.set_user_settings(1, &UserSettings { cal_limit: 100.0 })?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT cal_limit
-            FROM user_settings
-            WHERE user_id = 1
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            100.0,
-            StorageSqlite::get_float(res.first().unwrap(), "cal_limit").unwrap()
-        );
-
-        // Upser user settings
-        stg.set_user_settings(1, &UserSettings { cal_limit: 200.0 })?;
-
-        // Check in DB
-        let res = stg.raw_query(
-            r#"
-            SELECT cal_limit
-            FROM user_settings
-            WHERE user_id = 1
-        "#,
-            params![],
-        )?;
-
-        assert_eq!(1, res.len());
-        assert_eq!(
-            200.0,
-            StorageSqlite::get_float(res.first().unwrap(), "cal_limit").unwrap()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn get_user_settings() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get settings that not exists
-        let res = stg.get_user_settings(1);
-        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
-
-        // Set settings
-        let s = UserSettings { cal_limit: 200.0 };
-        stg.set_user_settings(1, &s)?;
-
-        // Get settings
-        let res = stg.get_user_settings(1)?;
-        assert_eq!(s, res);
-
-        Ok(())
-    }
-
-    //
-    // Bundle
-    //
-
-    #[test]
-    fn test_get_bundle() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get not existing bundle
-        let res = stg.get_bundle(1, "test");
-        assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
-
-        // Add bundle to DB
-        stg.raw_execute(
-            r#"
-            INSERT INTO bundle(user_id, key, data)
-            VALUES 
-                (1, 'test', '{"bundle1": 0, "food1": 1.1}')
-            ;
-        "#,
-            false,
-            params![],
-        )?;
-
-        // Get bundle
-        let res = stg.get_bundle(1, "test")?;
-        assert_eq!(
-            Bundle {
-                key: "test".into(),
-                data: HashMap::from([("bundle1".into(), 0.0), ("food1".into(), 1.1)]),
-            },
-            res
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_bundle_list() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Get empty bundle list
-        let res = stg.get_bundle_list(1);
-        assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
-
-        // Add bundle to DB
-        stg.raw_execute(
-            r#"
-            INSERT INTO bundle(user_id, key, data)
-            VALUES 
-                (1, 'test', '{"bundle1": 0, "food1": 1.1}'),
-                (1, 'test2', '{"bundle2": 0}')
-            ;
-        "#,
-            false,
-            params![],
-        )?;
-
-        // Get bundle list
-        let res = stg.get_bundle_list(1)?;
-        assert_eq!(
-            vec![
-                Bundle {
-                    key: "test".into(),
-                    data: HashMap::from([("bundle1".into(), 0.0), ("food1".into(), 1.1)]),
-                },
-                Bundle {
-                    key: "test2".into(),
-                    data: HashMap::from([("bundle2".into(), 0.0)]),
-                }
-            ],
-            res
-        );
-
-        Ok(())
-    }
-
-    //
-    // Restore/backup
-    //
-
-    #[test]
-    fn test_restore() -> Result<()> {
-        let db_file = NamedTempFile::new()?;
-        let stg = StorageSqlite::new(db_file.path())?;
-
-        // Do restore
-        stg.restore(&Backup {
-            timestamp: 1,
-            weight: vec![
-                WeightBackup {
-                    timestamp: 1,
-                    user_id: 1,
-                    value: 1.1,
-                },
-                WeightBackup {
-                    timestamp: 2,
-                    user_id: 1,
-                    value: 2.2,
-                },
-                WeightBackup {
-                    timestamp: 3,
-                    user_id: 1,
-                    value: 3.3,
-                },
-                WeightBackup {
-                    timestamp: 4,
-                    user_id: 2,
-                    value: 4.4,
-                },
-            ],
-            food: vec![
-                FoodBackup {
-                    key: "key2".into(),
-                    name: "Food 2".into(),
-                    brand: "Brand2".into(),
-                    cal100: 5.5,
-                    prot100: 6.6,
-                    fat100: 7.7,
-                    carb100: 8.8,
-                    comment: "Comment2".into(),
-                },
-                FoodBackup {
-                    key: "key1".into(),
-                    name: "Food 1".into(),
-                    brand: "Brand 1".into(),
-                    cal100: 1.1,
-                    prot100: 2.2,
-                    fat100: 3.3,
-                    carb100: 4.4,
-                    comment: "Comment1".into(),
-                },
-                FoodBackup {
-                    key: "key4".into(),
-                    name: "Еда 4".into(),
-                    brand: "Брэнд 4".into(),
-                    cal100: 100.100,
-                    prot100: 200.200,
-                    fat100: 300.300,
-                    carb100: 400.400,
-                    comment: "Комментарий 4".into(),
-                },
-                FoodBackup {
-                    key: "key3".into(),
-                    name: "Еда 3".into(),
-                    brand: "Брэнд 3".into(),
-                    cal100: 10.10,
-                    prot100: 20.20,
-                    fat100: 30.30,
-                    carb100: 40.40,
-                    comment: "Комментарий 3".into(),
-                },
-            ],
-            user_settings: vec![
-                UserSettingsBackup {
-                    user_id: 1,
-                    cal_limit: 1.0,
-                },
-                UserSettingsBackup {
-                    user_id: 2,
-                    cal_limit: 2.0,
-                },
-            ],
-        })?;
-
-        // Check weight list for user 1
-        let res = stg.get_weight_list(
-            1,
-            Timestamp::from_unix_millis(0).unwrap(),
-            Timestamp::from_unix_millis(10).unwrap(),
-        )?;
-        assert_eq!(
-            vec![
-                Weight {
-                    timestamp: Timestamp::from_unix_millis(1).unwrap(),
-                    value: 1.1
-                },
-                Weight {
-                    timestamp: Timestamp::from_unix_millis(2).unwrap(),
-                    value: 2.2
-                },
-                Weight {
-                    timestamp: Timestamp::from_unix_millis(3).unwrap(),
-                    value: 3.3
-                },
-            ],
-            res
-        );
-
-        // Check weight list for user 2
-        let res = stg.get_weight_list(
-            2,
-            Timestamp::from_unix_millis(0).unwrap(),
-            Timestamp::from_unix_millis(10).unwrap(),
-        )?;
-        assert_eq!(
-            vec![Weight {
-                timestamp: Timestamp::from_unix_millis(4).unwrap(),
-                value: 4.4
-            },],
-            res
-        );
-
-        // Check food
-        let res = stg.get_food_list()?;
-        assert_eq!(
-            vec![
-                Food {
-                    key: "key1".into(),
-                    name: "Food 1".into(),
-                    brand: "Brand 1".into(),
-                    cal100: 1.1,
-                    prot100: 2.2,
-                    fat100: 3.3,
-                    carb100: 4.4,
-                    comment: "Comment1".into(),
-                },
-                Food {
-                    key: "key2".into(),
-                    name: "Food 2".into(),
-                    brand: "Brand2".into(),
-                    cal100: 5.5,
-                    prot100: 6.6,
-                    fat100: 7.7,
-                    carb100: 8.8,
-                    comment: "Comment2".into(),
-                },
-                Food {
-                    key: "key3".into(),
-                    name: "Еда 3".into(),
-                    brand: "Брэнд 3".into(),
-                    cal100: 10.10,
-                    prot100: 20.20,
-                    fat100: 30.30,
-                    carb100: 40.40,
-                    comment: "Комментарий 3".into(),
-                },
-                Food {
-                    key: "key4".into(),
-                    name: "Еда 4".into(),
-                    brand: "Брэнд 4".into(),
-                    cal100: 100.100,
-                    prot100: 200.200,
-                    fat100: 300.300,
-                    carb100: 400.400,
-                    comment: "Комментарий 4".into(),
-                }
-            ],
-            res
-        );
-
-        // Check user settings
-        let res = stg.get_user_settings(1)?;
-        assert_eq!(1.0, res.cal_limit);
-
-        let res = stg.get_user_settings(2)?;
-        assert_eq!(2.0, res.cal_limit);
-
-        Ok(())
     }
 }

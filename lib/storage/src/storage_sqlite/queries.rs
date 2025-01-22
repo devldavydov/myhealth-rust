@@ -174,6 +174,11 @@ pub const UPSERT_BUNDLE: &str = "
         data = ?3
 ";
 
+pub const DELETE_BUNDLE: &str = "
+    DELETE FROM bundle
+    WHERE user_id = ?1 AND key = ?2
+";
+
 //
 // User settings
 //
