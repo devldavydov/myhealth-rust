@@ -73,6 +73,8 @@ pub enum StorageError {
     InvalidWeight,
     #[error("invalid food")]
     InvalidFood,
+    #[error("food is used")]
+    FoodIsUsed,
     #[error("invalid sport")]
     InvalidSport,
     #[error("sport is used in activity")]

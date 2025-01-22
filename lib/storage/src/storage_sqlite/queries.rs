@@ -164,6 +164,11 @@ pub const SELECT_BUNDLE_LIST: &str = "
     ORDER by key
 ";
 
+pub const SELECT_ALL_BUNDLES: &str = "
+    SELECT key, data
+    FROM bundle
+";
+
 pub const UPSERT_BUNDLE: &str = "
     INSERT INTO bundle (
         user_id, key, data

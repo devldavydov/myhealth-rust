@@ -460,6 +460,53 @@ fn test_delete_food() -> Result<()> {
 }
 
 #[test]
+fn test_delete_food_with_bundle() -> Result<()> {
+    let db_file = NamedTempFile::new()?;
+    let stg = StorageSqlite::new(db_file.path())?;
+
+    // Set food
+    stg.set_food(&Food {
+        key: "key1".into(),
+        name: "name1".into(),
+        brand: "brand".into(),
+        cal100: 1.1,
+        prot100: 2.2,
+        fat100: 3.3,
+        carb100: 4.4,
+        comment: "comment".into(),
+    })?;
+
+    stg.set_food(&Food {
+        key: "key2".into(),
+        name: "name2".into(),
+        brand: "brand".into(),
+        cal100: 1.1,
+        prot100: 2.2,
+        fat100: 3.3,
+        carb100: 4.4,
+        comment: "comment".into(),
+    })?;
+
+    // Set bundle
+    stg.set_bundle(
+        1,
+        &Bundle {
+            key: "bndl_key".into(),
+            data: HashMap::from([("key1".into(), 123.123)]),
+        },
+    )?;
+
+    // Check delete food, that is used in bundle
+    let res = stg.delete_food("key1");
+    assert!(stg.is_storage_error(StorageError::FoodIsUsed, &res.unwrap_err()));
+
+    // Delete food that not used
+    stg.delete_food("key2")?;
+
+    Ok(())
+}
+
+#[test]
 fn test_find_food() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;

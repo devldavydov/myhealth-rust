@@ -14,7 +14,7 @@ use teloxide::{
 };
 
 use crate::{
-    messages::{ERR_EMPTY, ERR_FOOD_NOT_FOUND, ERR_INTERNAL, ERR_WRONG_COMMAND, OK},
+    messages::{ERR_EMPTY, ERR_FOOD_IS_USED, ERR_FOOD_NOT_FOUND, ERR_INTERNAL, ERR_WRONG_COMMAND, OK},
     HandlerResult,
 };
 
@@ -297,8 +297,11 @@ async fn food_del(
     // Call storage
     if let Err(err) = stg.delete_food(args.first().unwrap()) {
         log::error!("del food error: {err}");
-        // TODO: if journal violation
-        bot.send_message(chat_id, ERR_INTERNAL).await?;
+        if stg.is_storage_error(StorageError::FoodIsUsed, &err) {
+            bot.send_message(chat_id, ERR_FOOD_IS_USED).await?;
+        } else {
+            bot.send_message(chat_id, ERR_INTERNAL).await?;
+        }
         return Ok(());
     };
 

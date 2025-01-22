@@ -298,8 +298,31 @@ impl Storage for StorageSqlite {
     }
 
     fn delete_food(&self, key: &str) -> Result<()> {
-        self.raw_execute(queries::DELETE_FOOD, false, params![key])
-            .context("exec delete food")
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().context("failed to get transaction")?;
+
+        // Check that food not used in bundle
+        let db_res = Self::raw_query_tx(&tx, queries::SELECT_ALL_BUNDLES, params![])
+            .context("get all bundles query")?;
+
+        for row in &db_res {
+            let json_data = Self::get_string(row, "data").context("get bundle data field")?;
+            let data: HashMap<String, f64> =
+                serde_json::from_str(&json_data).context("convert bundle data from JSON")?;
+
+            for (k, v) in &data {
+                if *v > 0.0 && k == key {
+                    bail!(StorageError::FoodIsUsed)
+                }
+            }
+        }
+
+        // Delete food
+        Self::raw_execute_tx(&tx, queries::DELETE_FOOD, false, params![key])
+            .context("exec delete food")?;
+        tx.commit().context("failed to commit transaction")?;
+
+        Ok(())
     }
 
     //
