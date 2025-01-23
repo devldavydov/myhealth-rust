@@ -12,7 +12,7 @@ pub struct Backup {
     pub food: Vec<FoodBackup>,
     #[serde(rename = "user_settings")]
     pub user_settings: Vec<UserSettingsBackup>,
-    #[serde(rename = "backup")]
+    #[serde(rename = "bundle")]
     pub bundle: Vec<BundleBackup>,
 }
 
