@@ -1,21 +1,17 @@
-use crate::{attrs::Attrs, Element};
+use crate::Element;
 
 pub struct I {
     val: String,
-    attrs: Attrs,
 }
 
 impl I {
-    pub fn new(val: &str, attrs: Attrs) -> Self {
-        Self {
-            val: val.into(),
-            attrs,
-        }
+    pub fn create(val: &str) -> Box<dyn Element> {
+        Box::new(Self { val: val.into() })
     }
 }
 
 impl Element for I {
     fn build(&self) -> String {
-        format!("<i {}>{}</i>", self.attrs, self.val)
+        format!("<i>{}</i>", self.val)
     }
 }

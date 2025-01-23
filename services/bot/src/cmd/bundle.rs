@@ -2,6 +2,7 @@ use html::{
     attrs::Attrs,
     div::Div,
     h::H,
+    i::I,
     s::S,
     table::{Table, Td, Tr},
 };
@@ -70,7 +71,7 @@ async fn bundle_set(
     let key = args.first().unwrap().to_string();
     let mut data = HashMap::with_capacity(args.len() - 1);
 
-    for i in 2..args.len() {
+    for i in 1..args.len() {
         let arg = args.get(i).unwrap();
         if arg.contains(":") {
             // Add dependant food
@@ -198,11 +199,14 @@ async fn bundle_list(
                     vec![("rowspan", b.data.len().to_string().as_str())].into_iter(),
                 )));
             }
-            tr = tr.add_td(Td::new(S::create(k)));
             if *v > 0.0 {
-                tr = tr.add_td(Td::new(S::create(&format!("{:.1}", v))));
+                tr = tr
+                    .add_td(Td::new(S::create(k)))
+                    .add_td(Td::new(S::create(&format!("{:.1}", v))));
             } else {
-                tr = tr.add_td(Td::new(S::create("")));
+                tr = tr
+                    .add_td(Td::new(I::create(k)))
+                    .add_td(Td::new(S::create("")));
             }
             tbl.add_row(tr);
         }
