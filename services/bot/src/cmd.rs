@@ -44,8 +44,14 @@ pub async fn process_command(
             } else {
                 match parts[0] {
                     "b" => {
-                        bundle::process_bundle_command(bot, msg.chat.id, parts[1..].to_vec(), stg)
-                            .await?;
+                        bundle::process_bundle_command(
+                            bot,
+                            user_id,
+                            msg.chat.id,
+                            parts[1..].to_vec(),
+                            stg,
+                        )
+                        .await?;
                     }
                     "f" => {
                         food::process_food_command(bot, msg.chat.id, parts[1..].to_vec(), stg)

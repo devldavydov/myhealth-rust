@@ -6,5 +6,6 @@ pub const ERR_FOOD_IS_USED: &str = "Еда уже используется в ж
 pub const ERR_SPORT_NOT_FOUND: &str = "Спорт не найден";
 pub const ERR_SPORT_IS_USED: &str = "Спорт уже используется в активностях";
 pub const ERR_USER_SETTINGS_NOT_FOUND: &str = "Пользовательские настройки не найдены";
+pub const ERR_BUNDLE_IS_USED: &str = "Бандл уже используется в другом бандле";
 pub const DEBUG_MODE: &str = "!!! ОТЛАДОЧНЫЙ РЕЖИМ !!!";
 pub const OK: &str = "OK";
