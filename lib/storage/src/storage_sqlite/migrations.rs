@@ -41,6 +41,7 @@ fn get_all_migrations() -> Migrations {
         (4, create_table_sport_activity),
         (5, create_table_user_settings),
         (6, create_table_bundle),
+        (7, create_table_journal),
     ]
 }
 
@@ -86,3 +87,11 @@ fn create_table_bundle(tx: &Transaction) -> Result<()> {
 
     Ok(())
 }
+
+fn create_table_journal(tx: &Transaction) -> Result<()> {
+    tx.execute(queries::CREATE_TABLE_JOURNAL, [])
+        .context("exec create table journal")?;
+
+    Ok(())
+}
+

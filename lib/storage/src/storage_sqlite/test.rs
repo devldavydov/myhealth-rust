@@ -14,7 +14,7 @@ fn test_migrations_apply() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;
 
-    assert_eq!(6, stg.get_last_migration_id().unwrap());
+    assert_eq!(7, stg.get_last_migration_id().unwrap());
 
     Ok(())
 }
