@@ -5,7 +5,8 @@ use std::sync::Mutex;
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
 use model::{
-    backup::Backup, Bundle, Food, Sport, SportActivity, SportActivityReport, UserSettings, Weight,
+    backup::Backup, Bundle, Food, Journal, Meal, Sport, SportActivity, SportActivityReport,
+    UserSettings, Weight,
 };
 use rusqlite::{
     functions::FunctionFlags, params, types::Value, Connection, Error::SqliteFailure, Params,
@@ -516,6 +517,56 @@ impl Storage for StorageSqlite {
             params![user_id, settings.cal_limit],
         )
         .context("exec upsert user settings")
+    }
+
+    //
+    // Journal
+    //
+
+    fn set_journal(&self, user_id: i64, journal: &Journal) -> Result<()> {
+        ensure!(journal.validate(), StorageError::JournalInvalid);
+
+        match self.raw_execute(
+            queries::UPSERT_JOURNAL,
+            false,
+            params![
+                user_id,
+                journal.timestamp.unix_millis(),
+                journal.food_key,
+                journal.food_weight,
+            ],
+        ) {
+            Err(err) => {
+                for cause in err.chain() {
+                    if let Some(SqliteFailure(_, Some(val))) =
+                        cause.downcast_ref::<rusqlite::Error>()
+                    {
+                        if val == "FOREIGN KEY constraint failed" {
+                            bail!(StorageError::InvalidFood)
+                        };
+
+                        bail!(err);
+                    }
+                }
+
+                bail!(err);
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn delete_journal(
+        &self,
+        user_id: i64,
+        timestamp: Timestamp,
+        meal: Meal,
+        food_key: &str,
+    ) -> Result<()> {
+        todo!()
+    }
+
+    fn delete_journal_meal(&self, user_id: i64, timestamp: Timestamp, meal: Meal) -> Result<()> {
+        todo!()
     }
 
     //

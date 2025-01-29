@@ -138,6 +138,31 @@ pub const CREATE_TABLE_JOURNAL: &str = "
     )
 ";
 
+pub const UPSERT_JOURNAL: &str = "
+    INSERT INTO journal (
+        user_id, timestamp, meal, foodkey, foodweight
+    )
+    VALUES (?1, ?2, ?3, ?4, ?5)
+    ON CONFLICT (user_id, timestamp, meal, foodkey) DO
+    UPDATE SET
+        foodweight = ?5
+";
+
+pub const DELETE_JOURNAL: &str = "
+    DELETE FROM journal
+    WHERE user_id = ?1 AND
+          timestamp = ?2 AND
+          meal = ?3 AND
+          foodkey = ?4
+";
+
+pub const DELETE_JOURNAL_MEAL: &str = "
+    DELETE FROM journal
+    WHERE user_id = ?1 AND
+          timestamp = ?2 AND
+          meal = ?3
+";
+
 //
 // Bundle
 //

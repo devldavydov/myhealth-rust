@@ -94,4 +94,3 @@ fn create_table_journal(tx: &Transaction) -> Result<()> {
 
     Ok(())
 }
-

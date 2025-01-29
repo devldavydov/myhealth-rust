@@ -1,6 +1,7 @@
 use anyhow::Result;
 use model::{
-    backup::Backup, Bundle, Food, Sport, SportActivity, SportActivityReport, UserSettings, Weight,
+    backup::Backup, Bundle, Food, Journal, Meal, Sport, SportActivity, SportActivityReport,
+    UserSettings, Weight,
 };
 use thiserror::Error;
 use types::timestamp::Timestamp;
@@ -27,6 +28,15 @@ pub trait Storage: Send + Sync {
     fn delete_weight(&self, user_id: i64, timestamp: Timestamp) -> Result<()>;
 
     // Journal
+    fn set_journal(&self, user_id: i64, journal: &Journal) -> Result<()>;
+    fn delete_journal(
+        &self,
+        user_id: i64,
+        timestamp: Timestamp,
+        meal: Meal,
+        food_key: &str,
+    ) -> Result<()>;
+    fn delete_journal_meal(&self, user_id: i64, timestamp: Timestamp, meal: Meal) -> Result<()>;
 
     // UserSettings
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings>;
@@ -93,4 +103,6 @@ pub enum StorageError {
     BundleDepRecursive,
     #[error("bundle is used")]
     BundleIsUsed,
+    #[error("journal invalid")]
+    JournalInvalid,
 }
