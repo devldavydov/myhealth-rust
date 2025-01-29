@@ -163,6 +163,26 @@ pub const DELETE_JOURNAL_MEAL: &str = "
           meal = ?3
 ";
 
+pub const JOURNAL_REPORT: &str = "
+    SELECT
+        j.timestamp,
+        j.meal,
+        j.foodkey,
+        f.name AS foodname,
+        f.brand AS foodbrand,
+        j.foodweight,
+        j.foodweigth / 100 * f.cal100 AS cal,
+        j.foodweight / 100 * f.prot100 AS prot,
+        j.foodweight / 100 * f.fat100 AS fat,
+        j.foodweight / 100 * f.carb100 AS carb
+    FROM journal j, food f
+    WHERE
+        j.foodkey = f.key AND
+        j.user_id = ?1 AND
+        j.timestamp >= ?2 AND
+        j.timestamp <= ?3 AND
+";
+
 //
 // Bundle
 //

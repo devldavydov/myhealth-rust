@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
 use model::{
-    backup::Backup, Bundle, Food, Journal, Meal, Sport, SportActivity, SportActivityReport,
-    UserSettings, Weight,
+    backup::Backup, Bundle, Food, Journal, JournalReport, Meal, Sport, SportActivity,
+    SportActivityReport, UserSettings, Weight,
 };
 use rusqlite::{
     functions::FunctionFlags, params, types::Value, Connection, Error::SqliteFailure, Params,
@@ -189,6 +189,14 @@ impl StorageSqlite {
 
     fn get_float(row: &HashMap<String, Value>, field: &str) -> Result<f64> {
         let Some(Value::Real(val)) = row.get(field) else {
+            bail!("failed to get \"{field}\" field")
+        };
+
+        Ok(*val)
+    }
+
+    fn get_integer(row: &HashMap<String, Value>, field: &str) -> Result<i64> {
+        let Some(Value::Integer(val)) = row.get(field) else {
             bail!("failed to get \"{field}\" field")
         };
 
@@ -532,6 +540,7 @@ impl Storage for StorageSqlite {
             params![
                 user_id,
                 journal.timestamp.unix_millis(),
+                u8::from(journal.meal),
                 journal.food_key,
                 journal.food_weight,
             ],
@@ -562,11 +571,56 @@ impl Storage for StorageSqlite {
         meal: Meal,
         food_key: &str,
     ) -> Result<()> {
-        todo!()
+        self.raw_execute(
+            queries::DELETE_JOURNAL,
+            false,
+            params![user_id, timestamp.unix_millis(), u8::from(meal), food_key],
+        )
+        .context("exec delete journal")
     }
 
     fn delete_journal_meal(&self, user_id: i64, timestamp: Timestamp, meal: Meal) -> Result<()> {
-        todo!()
+        self.raw_execute(
+            queries::DELETE_JOURNAL_MEAL,
+            false,
+            params![user_id, timestamp.unix_millis(), u8::from(meal)],
+        )
+        .context("exec delete journal")
+    }
+
+    fn get_journal_report(
+        &self,
+        user_id: i64,
+        from: Timestamp,
+        to: Timestamp,
+    ) -> Result<Vec<JournalReport>> {
+        let db_res = self
+            .raw_query(
+                queries::JOURNAL_REPORT,
+                params![user_id, from.unix_millis(), to.unix_millis()],
+            )
+            .context("get journal reportl query")?;
+
+        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+
+        let mut report = Vec::with_capacity(db_res.len());
+        for row in &db_res {
+            report.push(JournalReport {
+                timestamp: Self::get_timestamp(row, "timestamp").context("get timestamp field")?,
+                meal: Meal::new(Self::get_integer(row, "meal").context("get meal field")? as u8)
+                    .context("wrong meal")?,
+                food_key: Self::get_string(row, "foodkey").context("get foodkey field")?,
+                food_name: Self::get_string(row, "foodname").context("get foodname field")?,
+                food_brand: Self::get_string(row, "foodbrand").context("get foodbrand field")?,
+                food_weight: Self::get_float(row, "foodweight").context("get foodweight field")?,
+                cal: Self::get_float(row, "cal").context("get cal field")?,
+                prot: Self::get_float(row, "prot").context("get prot field")?,
+                fat: Self::get_float(row, "fat").context("get fat field")?,
+                carb: Self::get_float(row, "carb").context("get carb field")?,
+            });
+        }
+
+        Ok(report)
     }
 
     //

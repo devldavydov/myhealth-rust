@@ -22,6 +22,7 @@ pub struct Weight {
     pub value: f64,
 }
 
+#[derive(Copy, Clone)]
 pub enum Meal {
     Breakfast,
     FirstSnack,
@@ -36,6 +37,19 @@ pub struct Journal {
     pub meal: Meal,
     pub food_key: String,
     pub food_weight: f64,
+}
+
+pub struct JournalReport {
+    pub timestamp: Timestamp,
+    pub meal: Meal,
+    pub food_key: String,
+    pub food_name: String,
+    pub food_brand: String,
+    pub food_weight: f64,
+    pub cal: f64,
+    pub prot: f64,
+    pub fat: f64,
+    pub carb: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,7 +105,7 @@ impl Weight {
 }
 
 impl Meal {
-    fn new(v: u8) -> Result<Meal> {
+    pub fn new(v: u8) -> Result<Meal> {
         match v {
             0 => Ok(Meal::Breakfast),
             1 => Ok(Meal::FirstSnack),
@@ -113,6 +127,19 @@ impl From<Meal> for String {
             Meal::SecondSnack => "Полдник".into(),
             Meal::ThirdSnack => "До ужина".into(),
             Meal::Supper => "Ужин".into(),
+        }
+    }
+}
+
+impl From<Meal> for u8 {
+    fn from(value: Meal) -> Self {
+        match value {
+            Meal::Breakfast => 0,
+            Meal::FirstSnack => 1,
+            Meal::Dinner => 2,
+            Meal::SecondSnack => 3,
+            Meal::ThirdSnack => 4,
+            Meal::Supper => 5,
         }
     }
 }

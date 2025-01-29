@@ -1,7 +1,7 @@
 use anyhow::Result;
 use model::{
-    backup::Backup, Bundle, Food, Journal, Meal, Sport, SportActivity, SportActivityReport,
-    UserSettings, Weight,
+    backup::Backup, Bundle, Food, Journal, JournalReport, Meal, Sport, SportActivity,
+    SportActivityReport, UserSettings, Weight,
 };
 use thiserror::Error;
 use types::timestamp::Timestamp;
@@ -37,6 +37,12 @@ pub trait Storage: Send + Sync {
         food_key: &str,
     ) -> Result<()>;
     fn delete_journal_meal(&self, user_id: i64, timestamp: Timestamp, meal: Meal) -> Result<()>;
+    fn get_journal_report(
+        &self,
+        user_id: i64,
+        from: Timestamp,
+        to: Timestamp,
+    ) -> Result<Vec<JournalReport>>;
 
     // UserSettings
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings>;
