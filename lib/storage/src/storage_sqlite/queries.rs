@@ -171,7 +171,7 @@ pub const JOURNAL_REPORT: &str = "
         f.name AS foodname,
         f.brand AS foodbrand,
         j.foodweight,
-        j.foodweigth / 100 * f.cal100 AS cal,
+        j.foodweight / 100 * f.cal100 AS cal,
         j.foodweight / 100 * f.prot100 AS prot,
         j.foodweight / 100 * f.fat100 AS fat,
         j.foodweight / 100 * f.carb100 AS carb
@@ -180,7 +180,11 @@ pub const JOURNAL_REPORT: &str = "
         j.foodkey = f.key AND
         j.user_id = ?1 AND
         j.timestamp >= ?2 AND
-        j.timestamp <= ?3 AND
+        j.timestamp <= ?3
+    ORDER BY
+        j.timestamp,
+        j.meal,
+        f.name
 ";
 
 //

@@ -22,7 +22,7 @@ pub struct Weight {
     pub value: f64,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Meal {
     Breakfast,
     FirstSnack,
@@ -39,6 +39,7 @@ pub struct Journal {
     pub food_weight: f64,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct JournalReport {
     pub timestamp: Timestamp,
     pub meal: Meal,
@@ -113,6 +114,18 @@ impl Meal {
             3 => Ok(Meal::SecondSnack),
             4 => Ok(Meal::ThirdSnack),
             5 => Ok(Meal::Supper),
+            _ => Err(anyhow!("wrong meal")),
+        }
+    }
+
+    pub fn new_str(s: &str) -> Result<Meal> {
+        match s.to_uppercase().as_str() {
+            "ЗАВТРАК" => Ok(Meal::Breakfast),
+            "ДО ОБЕДА" => Ok(Meal::FirstSnack),
+            "ОБЕД" => Ok(Meal::Dinner),
+            "ПОЛДНИК" => Ok(Meal::SecondSnack),
+            "ДО УЖИНА" => Ok(Meal::ThirdSnack),
+            "УЖИН" => Ok(Meal::Supper),
             _ => Err(anyhow!("wrong meal")),
         }
     }

@@ -1325,6 +1325,88 @@ fn test_set_journal() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;
 
+    // Set invalid journal
+    for j in [
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::Breakfast,
+            food_key: "".into(),
+            food_weight: 0.0,
+        },
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::Breakfast,
+            food_key: "food".into(),
+            food_weight: 0.0,
+        },
+    ] {
+        let res = stg.set_journal(1, j);
+        assert!(stg.is_storage_error(StorageError::JournalInvalid, &res.unwrap_err()));
+    }
+
+    // Set journal with food not exists
+    let res = stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::Breakfast,
+            food_key: "food".into(),
+            food_weight: 1.0,
+        },
+    );
+    assert!(stg.is_storage_error(StorageError::FoodNotFound, &res.unwrap_err()));
+
+    // Set food
+    stg.set_food(&Food {
+        key: "food".into(),
+        name: "name".into(),
+        brand: "brand".into(),
+        cal100: 1.1,
+        prot100: 2.2,
+        fat100: 3.3,
+        carb100: 4.4,
+        comment: "comment".into(),
+    })?;
+
+    // Set journal
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::Breakfast,
+            food_key: "food".into(),
+            food_weight: 1.0,
+        },
+    )?;
+
+    // Check in DB
+    let res = stg.raw_query(
+        r#"
+            SELECT timestamp, meal, foodkey, foodweight
+            FROM journal
+            WHERE user_id = 1
+        "#,
+        params![],
+    )?;
+
+    assert_eq!(1, res.len());
+    assert_eq!(
+        Timestamp::from_unix_millis(1).unwrap(),
+        StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
+    );
+    assert_eq!(
+        0,
+        StorageSqlite::get_integer(res.first().unwrap(), "meal").unwrap()
+    );
+    assert_eq!(
+        String::from("food"),
+        StorageSqlite::get_string(res.first().unwrap(), "foodkey").unwrap()
+    );
+    assert_eq!(
+        1.0,
+        StorageSqlite::get_float(res.first().unwrap(), "foodweight").unwrap()
+    );
+
     Ok(())
 }
 
@@ -1332,6 +1414,104 @@ fn test_set_journal() -> Result<()> {
 fn test_set_journal_bundle() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;
+
+    // Set initial data
+    stg.set_food(&Food {
+        key: "food".into(),
+        name: "name".into(),
+        brand: "brand".into(),
+        cal100: 1.1,
+        prot100: 2.2,
+        fat100: 3.3,
+        carb100: 4.4,
+        comment: "comment".into(),
+    })?;
+    stg.set_food(&Food {
+        key: "food2".into(),
+        name: "name".into(),
+        brand: "brand".into(),
+        cal100: 1.1,
+        prot100: 2.2,
+        fat100: 3.3,
+        carb100: 4.4,
+        comment: "comment".into(),
+    })?;
+    stg.set_bundle(
+        1,
+        &Bundle {
+            key: "bndl2".into(),
+            data: HashMap::from([("food2".into(), 123.123)]),
+        },
+    )?;
+    stg.set_bundle(
+        1,
+        &Bundle {
+            key: "bndl1".into(),
+            data: HashMap::from([("food".into(), 456.456), ("bndl2".into(), 0.0)]),
+        },
+    )?;
+
+    // Set journal bundle not exists
+    let res = stg.set_journal_bundle(
+        1,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Meal::Breakfast,
+        "test",
+    );
+    assert!(stg.is_storage_error(StorageError::BundleNotFound, &res.unwrap_err()));
+
+    // Set journal bundle
+    stg.set_journal_bundle(
+        1,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Meal::Breakfast,
+        "bndl1",
+    )?;
+
+    // Check in DB
+    let res = stg.raw_query(
+        r#"
+            SELECT timestamp, meal, foodkey, foodweight
+            FROM journal
+            WHERE user_id = 1
+        "#,
+        params![],
+    )?;
+
+    assert_eq!(2, res.len());
+    assert_eq!(
+        Timestamp::from_unix_millis(1).unwrap(),
+        StorageSqlite::get_timestamp(res.first().unwrap(), "timestamp").unwrap()
+    );
+    assert_eq!(
+        0,
+        StorageSqlite::get_integer(res.first().unwrap(), "meal").unwrap()
+    );
+    assert_eq!(
+        String::from("food"),
+        StorageSqlite::get_string(res.first().unwrap(), "foodkey").unwrap()
+    );
+    assert_eq!(
+        456.456,
+        StorageSqlite::get_float(res.first().unwrap(), "foodweight").unwrap()
+    );
+    //
+    assert_eq!(
+        Timestamp::from_unix_millis(1).unwrap(),
+        StorageSqlite::get_timestamp(res.get(1).unwrap(), "timestamp").unwrap()
+    );
+    assert_eq!(
+        0,
+        StorageSqlite::get_integer(res.get(1).unwrap(), "meal").unwrap()
+    );
+    assert_eq!(
+        String::from("food2"),
+        StorageSqlite::get_string(res.get(1).unwrap(), "foodkey").unwrap()
+    );
+    assert_eq!(
+        123.123,
+        StorageSqlite::get_float(res.get(1).unwrap(), "foodweight").unwrap()
+    );
 
     Ok(())
 }
@@ -1341,13 +1521,86 @@ fn test_delete_journal() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;
 
-    Ok(())
-}
+    // Set inital data
+    stg.set_food(&Food {
+        key: "food".into(),
+        name: "name".into(),
+        brand: "brand".into(),
+        cal100: 1.1,
+        prot100: 2.2,
+        fat100: 3.3,
+        carb100: 4.4,
+        comment: "comment".into(),
+    })?;
+    stg.set_food(&Food {
+        key: "food2".into(),
+        name: "name".into(),
+        brand: "brand".into(),
+        cal100: 1.1,
+        prot100: 2.2,
+        fat100: 3.3,
+        carb100: 4.4,
+        comment: "comment".into(),
+    })?;
 
-#[test]
-fn test_delete_journal_meal() -> Result<()> {
-    let db_file = NamedTempFile::new()?;
-    let stg = StorageSqlite::new(db_file.path())?;
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::Breakfast,
+            food_key: "food".into(),
+            food_weight: 1.0,
+        },
+    )?;
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::Dinner,
+            food_key: "food".into(),
+            food_weight: 1.0,
+        },
+    )?;
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::Dinner,
+            food_key: "food2".into(),
+            food_weight: 2.0,
+        },
+    )?;
+
+    // Check in DB
+    let res = stg.raw_query(
+        r#"
+            SELECT *
+            FROM journal
+            WHERE user_id = 1
+        "#,
+        params![],
+    )?;
+    assert_eq!(3, res.len());
+
+    // Delete
+    stg.delete_journal(
+        1,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Meal::Breakfast,
+        "food",
+    )?;
+    stg.delete_journal_meal(1, Timestamp::from_unix_millis(1).unwrap(), Meal::Dinner)?;
+
+    // Check in DB
+    let res = stg.raw_query(
+        r#"
+            SELECT *
+            FROM journal
+            WHERE user_id = 1
+        "#,
+        params![],
+    )?;
+    assert_eq!(0, res.len());
 
     Ok(())
 }
@@ -1356,6 +1609,184 @@ fn test_delete_journal_meal() -> Result<()> {
 fn test_get_journal_report() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;
+
+    // Get empty report
+    let res = stg.get_journal_report(
+        1,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Timestamp::from_unix_millis(1).unwrap(),
+    );
+    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+
+    // Set data
+    stg.set_food(&Food {
+        key: "key_aaa".into(),
+        name: "aaa".into(),
+        brand: "brand_aaa".into(),
+        cal100: 1.0,
+        prot100: 2.0,
+        fat100: 3.0,
+        carb100: 4.0,
+        comment: "comment".into(),
+    })?;
+    stg.set_food(&Food {
+        key: "key_bbb".into(),
+        name: "bbb".into(),
+        brand: "brand_bbb".into(),
+        cal100: 1.0,
+        prot100: 2.0,
+        fat100: 3.0,
+        carb100: 4.0,
+        comment: "comment".into(),
+    })?;
+    stg.set_food(&Food {
+        key: "key_ccc".into(),
+        name: "ccc".into(),
+        brand: "brand_ccc".into(),
+        cal100: 1.0,
+        prot100: 2.0,
+        fat100: 3.0,
+        carb100: 4.0,
+        comment: "comment".into(),
+    })?;
+    stg.set_food(&Food {
+        key: "key_ddd".into(),
+        name: "Еда ЯЯЯ".into(),
+        brand: "brand_ddd".into(),
+        cal100: 1.0,
+        prot100: 2.0,
+        fat100: 3.0,
+        carb100: 4.0,
+        comment: "comment".into(),
+    })?;
+    stg.set_food(&Food {
+        key: "key_eee".into(),
+        name: "Еда ААА".into(),
+        brand: "brand_eee".into(),
+        cal100: 1.0,
+        prot100: 2.0,
+        fat100: 3.0,
+        carb100: 4.0,
+        comment: "comment".into(),
+    })?;
+
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::new_str("ужин").unwrap(),
+            food_key: "key_aaa".into(),
+            food_weight: 100.0,
+        },
+    )?;
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::new_str("обед").unwrap(),
+            food_key: "key_ccc".into(),
+            food_weight: 200.0,
+        },
+    )?;
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(1).unwrap(),
+            meal: Meal::new_str("обед").unwrap(),
+            food_key: "key_bbb".into(),
+            food_weight: 100.0,
+        },
+    )?;
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(2).unwrap(),
+            meal: Meal::new_str("завтрак").unwrap(),
+            food_key: "key_ddd".into(),
+            food_weight: 100.0,
+        },
+    )?;
+    stg.set_journal(
+        1,
+        &Journal {
+            timestamp: Timestamp::from_unix_millis(2).unwrap(),
+            meal: Meal::new_str("завтрак").unwrap(),
+            food_key: "key_eee".into(),
+            food_weight: 100.0,
+        },
+    )?;
+
+    // Get report
+    let res = stg.get_journal_report(
+        1,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Timestamp::from_unix_millis(2).unwrap(),
+    )?;
+    assert_eq!(
+        vec![
+            JournalReport {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                meal: Meal::new_str("обед").unwrap(),
+                food_key: "key_bbb".into(),
+                food_name: "bbb".into(),
+                food_brand: "brand_bbb".into(),
+                food_weight: 100.0,
+                cal: 1.0,
+                prot: 2.0,
+                fat: 3.0,
+                carb: 4.0,
+            },
+            JournalReport {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                meal: Meal::new_str("обед").unwrap(),
+                food_key: "key_ccc".into(),
+                food_name: "ccc".into(),
+                food_brand: "brand_ccc".into(),
+                food_weight: 200.0,
+                cal: 2.0,
+                prot: 4.0,
+                fat: 6.0,
+                carb: 8.0,
+            },
+            JournalReport {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                meal: Meal::new_str("ужин").unwrap(),
+                food_key: "key_aaa".into(),
+                food_name: "aaa".into(),
+                food_brand: "brand_aaa".into(),
+                food_weight: 100.0,
+                cal: 1.0,
+                prot: 2.0,
+                fat: 3.0,
+                carb: 4.0,
+            },
+            JournalReport {
+                timestamp: Timestamp::from_unix_millis(2).unwrap(),
+                meal: Meal::new_str("завтрак").unwrap(),
+                food_key: "key_eee".into(),
+                food_name: "Еда ААА".into(),
+                food_brand: "brand_eee".into(),
+                food_weight: 100.0,
+                cal: 1.0,
+                prot: 2.0,
+                fat: 3.0,
+                carb: 4.0,
+            },
+            JournalReport {
+                timestamp: Timestamp::from_unix_millis(2).unwrap(),
+                meal: Meal::new_str("завтрак").unwrap(),
+                food_key: "key_ddd".into(),
+                food_name: "Еда ЯЯЯ".into(),
+                food_brand: "brand_ddd".into(),
+                food_weight: 100.0,
+                cal: 1.0,
+                prot: 2.0,
+                fat: 3.0,
+                carb: 4.0,
+            }
+        ],
+        res
+    );
 
     Ok(())
 }
