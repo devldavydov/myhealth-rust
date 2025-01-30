@@ -79,7 +79,7 @@ async fn user_settings_get(
     match stg.get_user_settings(user_id) {
         Err(err) => {
             log::error!("get user settings error: {err}");
-            if stg.is_storage_error(StorageError::NotFound, &err) {
+            if stg.is_storage_error(StorageError::UserSettingsNotFound, &err) {
                 bot.send_message(chat_id, ERR_USER_SETTINGS_NOT_FOUND)
                     .await?;
             } else {

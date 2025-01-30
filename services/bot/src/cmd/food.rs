@@ -119,7 +119,7 @@ async fn food_set(
         comment,
     }) {
         log::error!("set food error: {err}");
-        if stg.is_storage_error(StorageError::InvalidFood, &err) {
+        if stg.is_storage_error(StorageError::FoodInvalid, &err) {
             bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
         } else {
             bot.send_message(chat_id, ERR_INTERNAL).await?;
@@ -147,7 +147,7 @@ async fn food_set_template(
     let food = match stg.get_food(args.first().unwrap()) {
         Err(err) => {
             log::error!("get food error: {err}");
-            if stg.is_storage_error(StorageError::NotFound, &err) {
+            if stg.is_storage_error(StorageError::FoodNotFound, &err) {
                 bot.send_message(chat_id, ERR_FOOD_NOT_FOUND).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;

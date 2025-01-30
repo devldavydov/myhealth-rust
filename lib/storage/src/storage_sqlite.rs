@@ -210,6 +210,58 @@ impl StorageSqlite {
 
         Ok(val.clone())
     }
+
+    fn get_bundle_food_items(
+        tx: &Transaction,
+        user_id: i64,
+        bndl_key: &str,
+    ) -> Result<HashMap<String, f64>> {
+        let mut bundles: Vec<String> = vec![bndl_key.into()];
+        let mut res = HashMap::new();
+        let mut i = 0;
+
+        while i < bundles.len() {
+            // Get next bundle
+            let db_res = Self::raw_query_tx(
+                tx,
+                queries::SELECT_BUNDLE,
+                params![user_id, bundles.get(i).unwrap()],
+            )
+            .context("get bundle query")?;
+
+            if db_res.is_empty() {
+                bail!(StorageError::BundleNotFound)
+            }
+
+            // Parse bundle data
+            let json_data = Self::get_string(db_res.first().unwrap(), "data")
+                .context("get bundle data field")?;
+            let data: HashMap<String, f64> =
+                serde_json::from_str(&json_data).context("convert bundle data from JSON")?;
+
+            for (k, v) in &data {
+                if *v == 0.0 {
+                    // Add bundle next bundle
+                    bundles.push(k.clone());
+                    continue;
+                }
+
+                // Check if food exists add to result map
+                let db_res = Self::raw_query_tx(&tx, queries::SELECT_FOOD, params![k])
+                    .context("get food query")?;
+
+                if db_res.is_empty() {
+                    bail!(StorageError::FoodNotFound)
+                }
+
+                res.insert(k.clone(), *v);
+            }
+
+            i += 1;
+        }
+
+        Ok(res)
+    }
 }
 
 impl Storage for StorageSqlite {
@@ -222,7 +274,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::SELECT_FOOD, params![key])
             .context("get food query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::NotFound);
+        ensure!(!db_res.is_empty(), StorageError::FoodNotFound);
 
         let row = db_res.first().unwrap();
 
@@ -263,7 +315,7 @@ impl Storage for StorageSqlite {
     }
 
     fn set_food(&self, food: &Food) -> Result<()> {
-        ensure!(food.validate(), StorageError::InvalidFood);
+        ensure!(food.validate(), StorageError::FoodInvalid);
 
         self.raw_execute(
             queries::UPSERT_FOOD,
@@ -343,7 +395,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::SELECT_BUNDLE, params![user_id, key])
             .context("get bundle query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::NotFound);
+        ensure!(!db_res.is_empty(), StorageError::BundleNotFound);
 
         let row = db_res.first().unwrap();
 
@@ -380,7 +432,7 @@ impl Storage for StorageSqlite {
     }
 
     fn set_bundle(&self, user_id: i64, bndl: &Bundle) -> Result<()> {
-        ensure!(bndl.validate(), StorageError::InvalidBundle);
+        ensure!(bndl.validate(), StorageError::BundleInvalid);
 
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction().context("failed to get transaction")?;
@@ -479,7 +531,7 @@ impl Storage for StorageSqlite {
     }
 
     fn set_weight(&self, user_id: i64, weight: &Weight) -> Result<()> {
-        ensure!(weight.validate(), StorageError::InvalidWeight);
+        ensure!(weight.validate(), StorageError::WeightInvalid);
 
         self.raw_execute(
             queries::UPSERT_WEIGHT,
@@ -507,7 +559,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::SELECT_USER_SETTINGS, params![user_id])
             .context("get user settings query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::NotFound);
+        ensure!(!db_res.is_empty(), StorageError::UserSettingsNotFound);
 
         let row = db_res.first().unwrap();
 
@@ -517,7 +569,7 @@ impl Storage for StorageSqlite {
     }
 
     fn set_user_settings(&self, user_id: i64, settings: &UserSettings) -> Result<()> {
-        ensure!(settings.validate(), StorageError::InvalidUserSettings);
+        ensure!(settings.validate(), StorageError::UserSettingsInvalid);
 
         self.raw_execute(
             queries::UPSERT_USER_SETTINGS,
@@ -551,7 +603,7 @@ impl Storage for StorageSqlite {
                         cause.downcast_ref::<rusqlite::Error>()
                     {
                         if val == "FOREIGN KEY constraint failed" {
-                            bail!(StorageError::InvalidFood)
+                            bail!(StorageError::FoodNotFound)
                         };
 
                         bail!(err);
@@ -562,6 +614,29 @@ impl Storage for StorageSqlite {
             }
             _ => Ok(()),
         }
+    }
+
+    fn set_journal_bundle(
+        &self,
+        user_id: i64,
+        timestamp: Timestamp,
+        meal: Meal,
+        bndl_key: &str,
+    ) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().context("failed to get transaction")?;
+
+        let food_items = Self::get_bundle_food_items(&tx, user_id, bndl_key)?;
+        for (k, v) in food_items {
+            Self::raw_execute_tx(
+                &tx,
+                queries::UPSERT_JOURNAL,
+                false,
+                params![user_id, timestamp.unix_millis(), u8::from(meal), k, v],
+            )?;
+        }
+
+        tx.commit().context("failed to commit transaction")
     }
 
     fn delete_journal(
@@ -632,7 +707,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::SELECT_SPORT, params![key])
             .context("get sport query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::NotFound);
+        ensure!(!db_res.is_empty(), StorageError::SportNotFound);
 
         let row = db_res.first().unwrap();
 
@@ -663,7 +738,7 @@ impl Storage for StorageSqlite {
     }
 
     fn set_sport(&self, sport: &Sport) -> Result<()> {
-        ensure!(sport.validate(), StorageError::InvalidSport);
+        ensure!(sport.validate(), StorageError::SportInvalid);
 
         self.raw_execute(
             queries::UPSERT_SPORT,
@@ -702,7 +777,7 @@ impl Storage for StorageSqlite {
     //
 
     fn set_sport_activity(&self, user_id: i64, act: &SportActivity) -> Result<()> {
-        ensure!(act.validate(), StorageError::InvalidSportActivity);
+        ensure!(act.validate(), StorageError::SportActivityInvalid);
 
         // Convert sets to JSON array
         let str_sets = serde_json::to_string(&json!(act.sets))
@@ -724,7 +799,7 @@ impl Storage for StorageSqlite {
                         cause.downcast_ref::<rusqlite::Error>()
                     {
                         if val == "FOREIGN KEY constraint failed" {
-                            bail!(StorageError::InvalidSport)
+                            bail!(StorageError::SportInvalid)
                         };
 
                         bail!(err);

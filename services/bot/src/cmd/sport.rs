@@ -86,7 +86,7 @@ async fn sport_set(
     // Call storage
     if let Err(err) = stg.set_sport(&Sport { key, name, comment }) {
         log::error!("set sport error: {err}");
-        if stg.is_storage_error(StorageError::InvalidSport, &err) {
+        if stg.is_storage_error(StorageError::SportInvalid, &err) {
             bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
         } else {
             bot.send_message(chat_id, ERR_INTERNAL).await?;
@@ -114,7 +114,7 @@ async fn sport_set_template(
     let sport = match stg.get_sport(args.first().unwrap()) {
         Err(err) => {
             log::error!("get sport error: {err}");
-            if stg.is_storage_error(StorageError::NotFound, &err) {
+            if stg.is_storage_error(StorageError::SportNotFound, &err) {
                 bot.send_message(chat_id, ERR_SPORT_NOT_FOUND).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;
@@ -260,7 +260,7 @@ async fn sport_activity_set(
         },
     ) {
         log::error!("set sport activity error: {err}");
-        if stg.is_storage_error(StorageError::InvalidSport, &err) {
+        if stg.is_storage_error(StorageError::SportInvalid, &err) {
             bot.send_message(chat_id, ERR_SPORT_NOT_FOUND).await?;
         } else {
             bot.send_message(chat_id, ERR_INTERNAL).await?;

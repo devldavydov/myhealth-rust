@@ -97,7 +97,7 @@ async fn weight_set(
     // Call storage
     if let Err(err) = stg.set_weight(user_id, &w) {
         log::error!("set weight error: {err}");
-        if stg.is_storage_error(StorageError::InvalidWeight, &err) {
+        if stg.is_storage_error(StorageError::WeightInvalid, &err) {
             bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
         } else {
             bot.send_message(chat_id, ERR_INTERNAL).await?;

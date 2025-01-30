@@ -29,6 +29,13 @@ pub trait Storage: Send + Sync {
 
     // Journal
     fn set_journal(&self, user_id: i64, journal: &Journal) -> Result<()>;
+    fn set_journal_bundle(
+        &self,
+        user_id: i64,
+        timestamp: Timestamp,
+        meal: Meal,
+        bndl_key: &str,
+    ) -> Result<()>;
     fn delete_journal(
         &self,
         user_id: i64,
@@ -81,26 +88,36 @@ pub enum StorageError {
     #[error("unknown")]
     #[default]
     Unknown,
-    #[error("not found")]
-    NotFound,
     #[error("empty list")]
     EmptyList,
-    #[error("invalid weight")]
-    InvalidWeight,
-    #[error("invalid food")]
-    InvalidFood,
+    // Weight
+    #[error("weight invalid")]
+    WeightInvalid,
+    // Food
+    #[error("food invalid")]
+    FoodInvalid,
     #[error("food is used")]
     FoodIsUsed,
-    #[error("invalid sport")]
-    InvalidSport,
+    #[error("food not found")]
+    FoodNotFound,
+    // Sport
+    #[error("sport invalid")]
+    SportInvalid,
+    #[error("sport not found")]
+    SportNotFound,
     #[error("sport is used in activity")]
     SportIsUsedViolation,
-    #[error("invalid sport activity")]
-    InvalidSportActivity,
-    #[error("invalid user settings")]
-    InvalidUserSettings,
-    #[error("invalid bundle")]
-    InvalidBundle,
+    // Sport activity
+    #[error("sport activity invalid")]
+    SportActivityInvalid,
+    // User settings
+    #[error("user settings invalid")]
+    UserSettingsInvalid,
+    #[error("user settings not found")]
+    UserSettingsNotFound,
+    // Bundle
+    #[error("bundle invalid")]
+    BundleInvalid,
     #[error("dependent food not found")]
     BundleDepFoodNotFound,
     #[error("dependent bundle not found")]
@@ -109,6 +126,9 @@ pub enum StorageError {
     BundleDepRecursive,
     #[error("bundle is used")]
     BundleIsUsed,
+    #[error("bundle not found")]
+    BundleNotFound,
+    // Journal
     #[error("journal invalid")]
     JournalInvalid,
 }

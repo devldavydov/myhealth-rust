@@ -105,7 +105,7 @@ async fn bundle_set(
         }
         Err(err) => {
             log::error!("set bundle error: {err}");
-            if stg.is_storage_error(StorageError::InvalidBundle, &err) {
+            if stg.is_storage_error(StorageError::BundleInvalid, &err) {
                 bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
             } else if stg.is_storage_error(StorageError::BundleDepBundleNotFound, &err) {
                 bot.send_message(chat_id, ERR_DEP_BUNDLE_NOT_FOUND).await?;
@@ -140,7 +140,7 @@ async fn bundle_set_template(
         Ok(v) => v,
         Err(err) => {
             log::error!("get bundle error: {err}");
-            if stg.is_storage_error(StorageError::NotFound, &err) {
+            if stg.is_storage_error(StorageError::BundleNotFound, &err) {
                 bot.send_message(chat_id, ERR_BUNDLE_NOT_FOUND).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;

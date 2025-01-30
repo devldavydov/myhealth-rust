@@ -148,7 +148,7 @@ fn test_set_weight() -> Result<()> {
             value: -1.1,
         },
     );
-    assert!(stg.is_storage_error(StorageError::InvalidWeight, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::WeightInvalid, &res.unwrap_err()));
 
     // Set weight
     stg.set_weight(
@@ -223,7 +223,7 @@ fn test_set_food() -> Result<()> {
         carb100: 4.4,
         comment: "comment".into(),
     });
-    assert!(stg.is_storage_error(StorageError::InvalidFood, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::FoodInvalid, &res.unwrap_err()));
 
     // Set food
     stg.set_food(&Food {
@@ -349,7 +349,7 @@ fn test_get_food() -> Result<()> {
 
     // Get food that not exists
     let res = stg.get_food("key");
-    assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::FoodNotFound, &res.unwrap_err()));
 
     // Set food
     let f = Food {
@@ -580,7 +580,7 @@ fn test_set_sport() -> Result<()> {
         name: "name".into(),
         comment: "comment".into(),
     });
-    assert!(stg.is_storage_error(StorageError::InvalidSport, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::SportInvalid, &res.unwrap_err()));
 
     // Set sport
     stg.set_sport(&Sport {
@@ -654,7 +654,7 @@ fn test_get_sport() -> Result<()> {
 
     // Get sport that not exists
     let res = stg.get_sport("key");
-    assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::SportNotFound, &res.unwrap_err()));
 
     // Set sport
     let s = Sport {
@@ -757,7 +757,7 @@ fn test_set_sport_activity() -> Result<()> {
             sets: vec![],
         },
     );
-    assert!(stg.is_storage_error(StorageError::InvalidSportActivity, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::SportActivityInvalid, &res.unwrap_err()));
 
     // Set sport activity for sport that not exists
     let res = stg.set_sport_activity(
@@ -768,7 +768,7 @@ fn test_set_sport_activity() -> Result<()> {
             sets: vec![1, 2, 3],
         },
     );
-    assert!(stg.is_storage_error(StorageError::InvalidSport, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::SportInvalid, &res.unwrap_err()));
 
     // Set sport
     stg.set_sport(&Sport {
@@ -1020,7 +1020,7 @@ fn set_user_settings() -> Result<()> {
 
     // Set invalid user settings
     let res = stg.set_user_settings(1, &UserSettings { cal_limit: 0.0 });
-    assert!(stg.is_storage_error(StorageError::InvalidUserSettings, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::UserSettingsInvalid, &res.unwrap_err()));
 
     // Set user settings
     stg.set_user_settings(1, &UserSettings { cal_limit: 100.0 })?;
@@ -1070,7 +1070,7 @@ fn get_user_settings() -> Result<()> {
 
     // Get settings that not exists
     let res = stg.get_user_settings(1);
-    assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::UserSettingsNotFound, &res.unwrap_err()));
 
     // Set settings
     let s = UserSettings { cal_limit: 200.0 };
@@ -1094,7 +1094,7 @@ fn test_get_bundle() -> Result<()> {
 
     // Get not existing bundle
     let res = stg.get_bundle(1, "test");
-    assert!(stg.is_storage_error(StorageError::NotFound, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::BundleNotFound, &res.unwrap_err()));
 
     // Add bundle to DB
     stg.raw_execute(
@@ -1183,7 +1183,7 @@ fn test_set_bundle() -> Result<()> {
         },
     ] {
         let res = stg.set_bundle(1, b);
-        assert!(stg.is_storage_error(StorageError::InvalidBundle, &res.unwrap_err()));
+        assert!(stg.is_storage_error(StorageError::BundleInvalid, &res.unwrap_err()));
     }
 
     // Check errors
@@ -1312,6 +1312,50 @@ fn test_delete_bundle() -> Result<()> {
     // Delete correct
     stg.delete_bundle(1, "bndl_key")?;
     stg.delete_bundle(1, "bndl_key_2")?;
+
+    Ok(())
+}
+
+//
+// Journal
+//
+
+#[test]
+fn test_set_journal() -> Result<()> {
+    let db_file = NamedTempFile::new()?;
+    let stg = StorageSqlite::new(db_file.path())?;
+
+    Ok(())
+}
+
+#[test]
+fn test_set_journal_bundle() -> Result<()> {
+    let db_file = NamedTempFile::new()?;
+    let stg = StorageSqlite::new(db_file.path())?;
+
+    Ok(())
+}
+
+#[test]
+fn test_delete_journal() -> Result<()> {
+    let db_file = NamedTempFile::new()?;
+    let stg = StorageSqlite::new(db_file.path())?;
+
+    Ok(())
+}
+
+#[test]
+fn test_delete_journal_meal() -> Result<()> {
+    let db_file = NamedTempFile::new()?;
+    let stg = StorageSqlite::new(db_file.path())?;
+
+    Ok(())
+}
+
+#[test]
+fn test_get_journal_report() -> Result<()> {
+    let db_file = NamedTempFile::new()?;
+    let stg = StorageSqlite::new(db_file.path())?;
 
     Ok(())
 }
