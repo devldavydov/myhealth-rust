@@ -247,7 +247,7 @@ impl StorageSqlite {
                 }
 
                 // Check if food exists add to result map
-                let db_res = Self::raw_query_tx(&tx, queries::SELECT_FOOD, params![k])
+                let db_res = Self::raw_query_tx(tx, queries::SELECT_FOOD, params![k])
                     .context("get food query")?;
 
                 if db_res.is_empty() {
