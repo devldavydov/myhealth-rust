@@ -902,6 +902,15 @@ impl Storage for StorageSqlite {
             .context("exec upsert backup bundle")?;
         }
 
+        for j in &backup.journal {
+            self.raw_execute(
+                queries::UPSERT_JOURNAL,
+                false,
+                params![j.user_id, j.timestamp, j.meal, j.food_key, j.food_weight],
+            )
+            .context("exec upsert backup journal")?;
+        }
+
         Ok(())
     }
 

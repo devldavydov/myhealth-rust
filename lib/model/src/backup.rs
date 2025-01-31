@@ -14,6 +14,8 @@ pub struct Backup {
     pub user_settings: Vec<UserSettingsBackup>,
     #[serde(rename = "bundle")]
     pub bundle: Vec<BundleBackup>,
+    #[serde(rename = "journal")]
+    pub journal: Vec<JournalBackup>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -62,4 +64,18 @@ pub struct BundleBackup {
     pub key: String,
     #[serde(rename = "data")]
     pub data: HashMap<String, f64>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct JournalBackup {
+    #[serde(rename = "user_id")]
+    pub user_id: i64,
+    #[serde(rename = "timestamp")]
+    pub timestamp: i64,
+    #[serde(rename = "meal")]
+    pub meal: i8,
+    #[serde(rename = "food_key")]
+    pub food_key: String,
+    #[serde(rename = "food_weight")]
+    pub food_weight: f64,
 }

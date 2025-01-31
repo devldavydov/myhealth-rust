@@ -2,7 +2,7 @@ use std::vec;
 
 use super::*;
 use anyhow::Result;
-use model::backup::{BundleBackup, FoodBackup, UserSettingsBackup, WeightBackup};
+use model::backup::{BundleBackup, FoodBackup, JournalBackup, UserSettingsBackup, WeightBackup};
 use tempfile::NamedTempFile;
 
 //
@@ -1889,6 +1889,22 @@ fn test_restore() -> Result<()> {
                 data: HashMap::from([("key2".into(), 100.0), ("bundle1".into(), 0.0)]),
             },
         ],
+        journal: vec![
+            JournalBackup {
+                user_id: 1,
+                timestamp: 1,
+                meal: 1,
+                food_key: "key1".into(),
+                food_weight: 100.0,
+            },
+            JournalBackup {
+                user_id: 1,
+                timestamp: 1,
+                meal: 2,
+                food_key: "key2".into(),
+                food_weight: 200.0,
+            },
+        ],
     })?;
 
     // Check weight list for user 1
@@ -1995,6 +2011,42 @@ fn test_restore() -> Result<()> {
             Bundle {
                 key: "bundle2".into(),
                 data: HashMap::from([("key2".into(), 100.0), ("bundle1".into(), 0.0)]),
+            },
+        ],
+        res
+    );
+
+    // Check journa
+    let res = stg.get_journal_report(
+        1,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Timestamp::from_unix_millis(1).unwrap(),
+    )?;
+    assert_eq!(
+        vec![
+            JournalReport {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                meal: Meal::new_str("до обеда").unwrap(),
+                food_key: "key1".into(),
+                food_name: "Food 1".into(),
+                food_brand: "Brand 1".into(),
+                food_weight: 100.0,
+                cal: 1.1,
+                prot: 2.2,
+                fat: 3.3,
+                carb: 4.4,
+            },
+            JournalReport {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                meal: Meal::Dinner,
+                food_key: "key2".into(),
+                food_name: "Food 2".into(),
+                food_brand: "Brand2".into(),
+                food_weight: 200.0,
+                cal: 11.0,
+                prot: 13.2,
+                fat: 15.4,
+                carb: 17.6
             },
         ],
         res
