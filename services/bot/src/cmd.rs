@@ -60,9 +60,11 @@ pub async fn process_command(
                     "j" => {
                         journal::process_journal_command(
                             bot,
+                            user_id,
                             msg.chat.id,
                             parts[1..].to_vec(),
                             stg,
+                            tz,
                         )
                         .await?;
                     }
