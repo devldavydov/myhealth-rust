@@ -6,11 +6,20 @@ pub struct B {
 }
 
 impl B {
-    pub fn new(val: &str, attrs: Attrs) -> Self {
+    pub fn new(val: &str) -> Self {
         Self {
             val: val.into(),
-            attrs,
+            attrs: Attrs::default(),
         }
+    }
+
+    pub fn set_attr(mut self, attrs: Attrs) -> Self {
+        self.attrs = attrs;
+        self
+    }
+
+    pub fn as_box(self) -> Box<dyn Element> {
+        Box::new(self)
     }
 }
 

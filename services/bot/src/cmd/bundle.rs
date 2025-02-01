@@ -212,14 +212,16 @@ async fn bundle_list(
         }
     }
 
-    doc = doc.add_element(Box::new(
+    doc = doc.add_element(
         Div::new_container()
-            .add_element(Box::new(
+            .add_element(
                 H::new("Список бандлов", 5)
-                    .set_attr(Attrs::from_items(vec![("align", "center")].into_iter())),
-            ))
-            .add_element(Box::new(tbl)),
-    ));
+                    .set_attr(Attrs::from_items(vec![("align", "center")].into_iter()))
+                    .as_box(),
+            )
+            .add_element(tbl.as_box())
+            .as_box(),
+    );
 
     bot.send_document(
         chat_id,

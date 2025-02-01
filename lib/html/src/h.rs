@@ -19,6 +19,10 @@ impl H {
         self.attrs = attrs;
         self
     }
+
+    pub fn as_box(self) -> Box<dyn Element> {
+        Box::new(self)
+    }
 }
 
 impl Element for H {

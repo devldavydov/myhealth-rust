@@ -22,6 +22,10 @@ impl Table {
     pub fn add_footer_element(&mut self, elem: Box<dyn Element>) {
         self.footer.push(elem);
     }
+
+    pub fn as_box(self) -> Box<dyn Element> {
+        Box::new(self)
+    }
 }
 
 impl Element for Table {

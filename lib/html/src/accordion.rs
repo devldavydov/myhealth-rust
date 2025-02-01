@@ -17,6 +17,10 @@ impl Accordion {
         item.set_accordion_id(&self.id);
         self.items.push(item);
     }
+
+    pub fn as_box(self) -> Box<dyn Element> {
+        Box::new(self)
+    }
 }
 
 impl Element for Accordion {

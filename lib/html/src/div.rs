@@ -21,6 +21,10 @@ impl Div {
         self.elements.push(element);
         self
     }
+
+    pub fn as_box(self) -> Box<dyn Element> {
+        Box::new(self)
+    }
 }
 
 impl Element for Div {

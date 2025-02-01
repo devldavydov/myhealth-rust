@@ -221,7 +221,7 @@ async fn weight_list(
     accrd.add_item(AccordionItem::new(
         "tbl",
         &format!("Таблица веса за {} - {}", &ts_from, &ts_to),
-        Box::new(tbl),
+        tbl.as_box(),
     ));
 
     // Chart
@@ -251,7 +251,7 @@ async fn weight_list(
 
     // Doc
     doc = doc
-        .add_element(Box::new(Div::new_container().add_element(Box::new(accrd))))
+        .add_element(Div::new_container().add_element(accrd.as_box()).as_box())
         .add_element(Script::create(JS_BOOTSTRAP_URL))
         .add_element(Script::create(JS_CHART_URL))
         .add_element(S::create(&chart_snip));

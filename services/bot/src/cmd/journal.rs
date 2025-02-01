@@ -1,8 +1,19 @@
 use chrono_tz::Tz;
-use model::{Bundle, Journal, Meal};
+use html::{
+    attrs::Attrs,
+    b::B,
+    div::Div,
+    h::H,
+    s::S,
+    table::{Table, Td, Tr},
+};
+use model::{Bundle, Journal, Meal, UserSettings};
 use std::sync::Arc;
 use storage::{Storage, StorageError};
-use teloxide::{prelude::*, types::ParseMode};
+use teloxide::{
+    prelude::*,
+    types::{InputFile, ParseMode},
+};
 
 use crate::{
     messages::{
@@ -41,7 +52,7 @@ pub async fn process_journal_command(
             journal_del_meal(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
         }
         "rd" => {
-            journal_report_day(bot, user_id, chat_id, args[1..].to_vec(), stg).await?;
+            journal_report_day(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
         }
         "tm" => {
             journal_template_meal(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
@@ -278,8 +289,153 @@ async fn journal_report_day(
     chat_id: ChatId,
     args: Vec<&str>,
     stg: Arc<Box<dyn Storage>>,
+    tz: Tz,
 ) -> HandlerResult {
-    todo!()
+    if args.len() != 1 {
+        log::error!("wrong args count");
+        bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+        return Ok(());
+    }
+
+    // Parse args
+    let timestamp = match parse_timestamp(args.first().unwrap(), tz) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("parse timestamp error: {err}");
+            bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+            return Ok(());
+        }
+    };
+
+    // Call storage
+    let rep = match stg.get_journal_report(user_id, timestamp.clone(), timestamp.clone()) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("get journal report error: {err}");
+            if stg.is_storage_error(StorageError::EmptyList, &err) {
+                bot.send_message(chat_id, ERR_EMPTY).await?;
+            } else {
+                bot.send_message(chat_id, ERR_INTERNAL).await?;
+            }
+            return Ok(());
+        }
+    };
+
+    let us: Option<UserSettings> = match stg.get_user_settings(user_id) {
+        Ok(v) => Some(v),
+        Err(err) => {
+            if stg.is_storage_error(StorageError::UserSettingsNotFound, &err) {
+                None
+            } else {
+                bot.send_message(chat_id, ERR_INTERNAL).await?;
+                return Ok(());
+            }
+        }
+    };
+
+    // Generate html
+    let mut doc = html::Builder::new("Журнал приема пищи");
+    let mut tbl = Table::new(vec![
+        "Наименование".into(),
+        "Вес".into(),
+        "ККал".into(),
+        "Белки".into(),
+        "Жиры".into(),
+        "Углеводы".into(),
+    ]);
+    let ts_str = format_timestamp(&timestamp, "%d.%m.%Y", tz);
+
+    let (mut total_cal, mut total_prot, mut total_fat, mut total_carb) = (0.0, 0.0, 0.0, 0.0);
+    let (mut sub_total_cal, mut sub_total_prot, mut sub_total_fat, mut sub_total_carb) =
+        (0.0, 0.0, 0.0, 0.0);
+    let mut last_meal: Option<Meal> = None;
+
+    for i in 0..rep.len() {
+        let jr = &rep[i];
+
+        // Add meal divider
+        if last_meal.is_none() || (last_meal.is_some() && jr.meal != last_meal.unwrap()) {
+            tbl.add_row(
+                Tr::new()
+                    .set_attrs(Attrs::from_items(
+                        vec![("class", "table-active")].into_iter(),
+                    ))
+                    .add_td(
+                        Td::new(B::new(String::from(jr.meal).as_str()).as_box()).set_attrs(
+                            Attrs::from_items(
+                                vec![("colspan", "6"), ("align", "center")].into_iter(),
+                            ),
+                        ),
+                    ),
+            );
+
+            last_meal = Some(jr.meal)
+        }
+
+        // Add meal rows
+        let mut food_lbl = jr.food_name.clone();
+        if !jr.food_brand.is_empty() {
+            food_lbl.push_str(&format!(" - {}", jr.food_brand));
+        }
+        food_lbl.push_str(&format!(" [{}]", jr.food_key));
+
+        tbl.add_row(
+            Tr::new()
+                .add_td(Td::new(S::create(&food_lbl)))
+                .add_td(Td::new(S::create(&format!("{:.1}", jr.food_weight))))
+                .add_td(Td::new(S::create(&format!("{:.2}", jr.cal))))
+                .add_td(Td::new(S::create(&format!("{:.2}", jr.prot))))
+                .add_td(Td::new(S::create(&format!("{:.2}", jr.fat))))
+                .add_td(Td::new(S::create(&format!("{:.2}", jr.carb)))),
+        );
+
+        total_cal += jr.cal;
+        total_prot += jr.prot;
+        total_fat += jr.fat;
+        total_carb += jr.carb;
+
+        sub_total_cal += jr.cal;
+        sub_total_prot += jr.prot;
+        sub_total_fat += jr.fat;
+        sub_total_carb += jr.carb;
+
+        // Add subtotal row
+        if i == rep.len() - 1 || rep[i + 1].meal != jr.meal {
+            tbl.add_row(
+                Tr::new()
+                    .add_td(
+                        Td::new(B::new("Всего").as_box()).set_attrs(Attrs::from_items(
+                            vec![("colspan", "2"), ("align", "right")].into_iter(),
+                        )),
+                    )
+                    .add_td(Td::new(S::create(&format!("{:.2}", sub_total_cal))))
+                    .add_td(Td::new(S::create(&format!("{:.2}", sub_total_prot))))
+                    .add_td(Td::new(S::create(&format!("{:.2}", sub_total_fat))))
+                    .add_td(Td::new(S::create(&format!("{:.2}", sub_total_carb)))),
+            );
+
+            (sub_total_cal, sub_total_prot, sub_total_fat, sub_total_carb) = (0.0, 0.0, 0.0, 0.0);
+        }
+    }
+
+    doc = doc.add_element(
+        Div::new_container()
+            .add_element(
+                H::new(&format!("Журнал приема пищи за {}", ts_str), 5)
+                    .set_attr(Attrs::from_items(vec![("align", "center")].into_iter()))
+                    .as_box(),
+            )
+            .add_element(tbl.as_box())
+            .as_box(),
+    );
+
+    bot.send_document(
+        chat_id,
+        InputFile::memory(doc.build()).file_name(format!("report_{}.html", ts_str)),
+    )
+    .await?;
+
+    Ok(())
 }
 
 async fn journal_template_meal(

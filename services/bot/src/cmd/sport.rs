@@ -164,14 +164,16 @@ async fn sport_list(bot: Bot, chat_id: ChatId, stg: Arc<Box<dyn Storage>>) -> Ha
         );
     }
 
-    doc = doc.add_element(Box::new(
+    doc = doc.add_element(
         Div::new_container()
-            .add_element(Box::new(
+            .add_element(
                 H::new("Список спорта", 5)
-                    .set_attr(Attrs::from_items(vec![("align", "center")].into_iter())),
-            ))
-            .add_element(Box::new(tbl)),
-    ));
+                    .set_attr(Attrs::from_items(vec![("align", "center")].into_iter()))
+                    .as_box(),
+            )
+            .add_element(tbl.as_box())
+            .as_box(),
+    );
 
     bot.send_document(
         chat_id,
@@ -411,17 +413,19 @@ async fn sport_activity_report(
         }
     }
 
-    doc = doc.add_element(Box::new(
+    doc = doc.add_element(
         Div::new_container()
-            .add_element(Box::new(
+            .add_element(
                 H::new(
                     &format!("Спортивная активность за {} - {}", &ts_from, &ts_to),
                     5,
                 )
-                .set_attr(Attrs::from_items(vec![("align", "center")].into_iter())),
-            ))
-            .add_element(Box::new(tbl)),
-    ));
+                .set_attr(Attrs::from_items(vec![("align", "center")].into_iter()))
+                .as_box(),
+            )
+            .add_element(tbl.as_box())
+            .as_box(),
+    );
 
     bot.send_document(
         chat_id,
