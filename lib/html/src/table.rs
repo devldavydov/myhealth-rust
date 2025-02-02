@@ -114,6 +114,10 @@ impl Tr {
         self.items.push(td);
         self
     }
+
+    pub fn as_box(self) -> Box<dyn Element> {
+        Box::new(self)
+    }
 }
 
 impl Default for Tr {

@@ -5,8 +5,8 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn new(elements: Vec<Box<dyn Element>>) -> Self {
-        Self { elements }
+    pub fn create(elements: Vec<Box<dyn Element>>) -> Box<dyn Element> {
+        Box::new(Self { elements })
     }
 }
 

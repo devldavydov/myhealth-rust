@@ -5,9 +5,11 @@ use html::{
     div::Div,
     h::H,
     s::S,
+    span::Span,
     table::{Table, Td, Tr},
+    Element,
 };
-use model::{Bundle, Journal, Meal, UserSettings};
+use model::{Journal, Meal, UserSettings};
 use std::sync::Arc;
 use storage::{Storage, StorageError};
 use teloxide::{
@@ -418,6 +420,80 @@ async fn journal_report_day(
         }
     }
 
+    // Footer
+    let total_pfc = total_prot + total_fat + total_carb;
+    tbl.add_footer_element(
+        Tr::new()
+            .add_td(
+                Td::new(Span::create(vec![
+                    B::new("Всего потреблено, ккал: ").as_box(),
+                    S::create(&format!("{:.2}", total_cal)),
+                ]))
+                .set_attrs(Attrs::from_items(vec![("colspan", "6")].into_iter())),
+            )
+            .as_box(),
+    );
+
+    if us.is_some() {
+        let us = us.unwrap();
+        tbl.add_footer_element(
+            Tr::new()
+                .add_td(
+                    Td::new(Span::create(vec![
+                        B::new("Лимит, ккал: ").as_box(),
+                        S::create(&format!("{:.2}", us.cal_limit)),
+                    ]))
+                    .set_attrs(Attrs::from_items(vec![("colspan", "6")].into_iter())),
+                )
+                .as_box(),
+        );
+        tbl.add_footer_element(
+            Tr::new()
+                .add_td(
+                    Td::new(Span::create(vec![
+                        B::new("Разница, ккал: ").as_box(),
+                        call_diff_snippet(us.cal_limit - total_cal),
+                    ]))
+                    .set_attrs(Attrs::from_items(vec![("colspan", "6")].into_iter())),
+                )
+                .as_box(),
+        );
+    }
+
+    tbl.add_footer_element(
+        Tr::new()
+            .add_td(
+                Td::new(Span::create(vec![
+                    B::new("Всего, Б: ").as_box(),
+                    pfc_snippet(total_prot, total_pfc),
+                ]))
+                .set_attrs(Attrs::from_items(vec![("colspan", "6")].into_iter())),
+            )
+            .as_box(),
+    );
+    tbl.add_footer_element(
+        Tr::new()
+            .add_td(
+                Td::new(Span::create(vec![
+                    B::new("Всего, Ж: ").as_box(),
+                    pfc_snippet(total_fat, total_pfc),
+                ]))
+                .set_attrs(Attrs::from_items(vec![("colspan", "6")].into_iter())),
+            )
+            .as_box(),
+    );
+    tbl.add_footer_element(
+        Tr::new()
+            .add_td(
+                Td::new(Span::create(vec![
+                    B::new("Всего, У: ").as_box(),
+                    pfc_snippet(total_carb, total_pfc),
+                ]))
+                .set_attrs(Attrs::from_items(vec![("colspan", "6")].into_iter())),
+            )
+            .as_box(),
+    );
+
     doc = doc.add_element(
         Div::new_container()
             .add_element(
@@ -534,4 +610,30 @@ async fn journal_template_meal(
     }
 
     Ok(())
+}
+
+fn call_diff_snippet(diff: f64) -> Box<dyn Element> {
+    if diff < 0.0 && diff.abs() > 0.01 {
+        B::new(&format!("{:.2}", diff))
+            .set_attr(Attrs::from_items(
+                vec![("class", "text-danger")].into_iter(),
+            ))
+            .as_box()
+    } else if diff >= 0.0 && diff.abs() > 0.01 {
+        B::new(&format!("+{:.2}", diff))
+            .set_attr(Attrs::from_items(
+                vec![("class", "text-success")].into_iter(),
+            ))
+            .as_box()
+    } else {
+        S::create(&format!("{:.2}", diff))
+    }
+}
+
+fn pfc_snippet(val: f64, total: f64) -> Box<dyn Element> {
+    if total == 0.0 {
+        S::create(&format!("{:.2}", val))
+    } else {
+        S::create(&format!("{:.2} ({:.2}%)", val, val / total * 100.0))
+    }
 }
