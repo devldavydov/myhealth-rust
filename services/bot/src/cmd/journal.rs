@@ -1,3 +1,4 @@
+use chrono::Duration;
 use chrono_tz::Tz;
 use html::{
     attrs::Attrs,
@@ -16,6 +17,7 @@ use teloxide::{
     prelude::*,
     types::{InputFile, ParseMode},
 };
+use types::timestamp::Timestamp;
 
 use crate::{
     messages::{
@@ -58,6 +60,9 @@ pub async fn process_journal_command(
         }
         "tm" => {
             journal_template_meal(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
+        }
+        "fa" => {
+            journal_food_avg_weight(bot, user_id, chat_id, args[1..].to_vec(), stg, tz).await?;
         }
         _ => {
             log::error!("unknown command");
@@ -314,7 +319,7 @@ async fn journal_report_day(
         Ok(v) => v,
         Err(err) => {
             log::error!("get journal report error: {err}");
-            if stg.is_storage_error(StorageError::EmptyList, &err) {
+            if stg.is_storage_error(StorageError::EmptyResult, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;
@@ -552,7 +557,7 @@ async fn journal_template_meal(
         Ok(v) => v,
         Err(err) => {
             log::error!("get journal report error: {err}");
-            if stg.is_storage_error(StorageError::EmptyList, &err) {
+            if stg.is_storage_error(StorageError::EmptyResult, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;
@@ -608,6 +613,45 @@ async fn journal_template_meal(
         )
         .await?;
     }
+
+    Ok(())
+}
+
+async fn journal_food_avg_weight(
+    bot: Bot,
+    user_id: i64,
+    chat_id: ChatId,
+    args: Vec<&str>,
+    stg: Arc<Box<dyn Storage>>,
+    tz: Tz,
+) -> HandlerResult {
+    if args.len() != 1 {
+        log::error!("wrong args count");
+        bot.send_message(chat_id, ERR_WRONG_COMMAND).await?;
+        return Ok(());
+    }
+
+    // Parse args
+    let food_key = args.first().unwrap();
+
+    let ts_to = Timestamp::now().with_timezone(tz);
+    let ts_from = ts_to.sub(Duration::days(365));
+
+    // Call storage
+    let res = match stg.get_journal_food_avg_weight(user_id, food_key, ts_from, ts_to) {
+        Ok(v) => v,
+        Err(err) => {
+            log::error!("get journal avg weight error: {err}");
+            bot.send_message(chat_id, ERR_INTERNAL).await?;
+            return Ok(());
+        }
+    };
+
+    bot.send_message(
+        chat_id,
+        format!("Средний вес приема пищи за год, гр.: {:.1}", res),
+    )
+    .await?;
 
     Ok(())
 }

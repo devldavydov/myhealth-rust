@@ -50,6 +50,13 @@ pub trait Storage: Send + Sync {
         from: Timestamp,
         to: Timestamp,
     ) -> Result<Vec<JournalReport>>;
+    fn get_journal_food_avg_weight(
+        &self,
+        user_id: i64,
+        food_key: &str,
+        from: Timestamp,
+        to: Timestamp,
+    ) -> Result<f64>;
 
     // UserSettings
     fn get_user_settings(&self, user_id: i64) -> Result<UserSettings>;
@@ -88,8 +95,8 @@ pub enum StorageError {
     #[error("unknown")]
     #[default]
     Unknown,
-    #[error("empty list")]
-    EmptyList,
+    #[error("empty result")]
+    EmptyResult,
     // Weight
     #[error("weight invalid")]
     WeightInvalid,

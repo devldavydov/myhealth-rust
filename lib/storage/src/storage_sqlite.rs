@@ -295,7 +295,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::SELECT_FOOD_LIST, params![])
             .context("get food list query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+        ensure!(!db_res.is_empty(), StorageError::EmptyResult);
 
         let mut food_list = Vec::with_capacity(db_res.len());
         for row in &db_res {
@@ -339,7 +339,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::FIND_FOOD, params![pattern.to_uppercase()])
             .context("find food list query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+        ensure!(!db_res.is_empty(), StorageError::EmptyResult);
 
         let mut food_list = Vec::with_capacity(db_res.len());
         for row in &db_res {
@@ -414,7 +414,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::SELECT_BUNDLE_LIST, params![user_id])
             .context("get bundle list query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+        ensure!(!db_res.is_empty(), StorageError::EmptyResult);
 
         let mut res = Vec::with_capacity(db_res.len());
         for row in &db_res {
@@ -516,7 +516,7 @@ impl Storage for StorageSqlite {
             )
             .context("weight list query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+        ensure!(!db_res.is_empty(), StorageError::EmptyResult);
 
         let mut res = Vec::with_capacity(db_res.len());
         for row in &db_res {
@@ -676,7 +676,7 @@ impl Storage for StorageSqlite {
             )
             .context("get journal reportl query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+        ensure!(!db_res.is_empty(), StorageError::EmptyResult);
 
         let mut report = Vec::with_capacity(db_res.len());
         for row in &db_res {
@@ -696,6 +696,24 @@ impl Storage for StorageSqlite {
         }
 
         Ok(report)
+    }
+
+    fn get_journal_food_avg_weight(
+        &self,
+        user_id: i64,
+        food_key: &str,
+        from: Timestamp,
+        to: Timestamp,
+    ) -> Result<f64> {
+        let db_res = self
+            .raw_query(
+                queries::JOURNAL_FOOD_AVG_WEIGHT,
+                params![user_id, food_key, from.unix_millis(), to.unix_millis()],
+            )
+            .context("get journal food avg weight query")?;
+
+        Self::get_float(db_res.first().unwrap(), "avg_food_weight")
+            .context("get avg_food_weight field")
     }
 
     //
@@ -723,7 +741,7 @@ impl Storage for StorageSqlite {
             .raw_query(queries::SELECT_SPORT_LIST, params![])
             .context("get sport list query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+        ensure!(!db_res.is_empty(), StorageError::EmptyResult);
 
         let mut sport_list = Vec::with_capacity(db_res.len());
         for row in &db_res {
@@ -839,7 +857,7 @@ impl Storage for StorageSqlite {
             )
             .context("sport activity report query")?;
 
-        ensure!(!db_res.is_empty(), StorageError::EmptyList);
+        ensure!(!db_res.is_empty(), StorageError::EmptyResult);
 
         let mut res = Vec::with_capacity(db_res.len());
         for row in &db_res {

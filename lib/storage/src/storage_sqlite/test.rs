@@ -35,7 +35,7 @@ fn test_get_weight_list() -> Result<()> {
         Timestamp::from_unix_millis(10).unwrap(),
     );
 
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     // Add test data
     stg.raw_execute(
@@ -118,7 +118,7 @@ fn test_delete_weight() -> Result<()> {
         Timestamp::from_unix_millis(0).unwrap(),
         Timestamp::from_unix_millis(10).unwrap(),
     );
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     // Delete for user 1 record that not exists (timestamp=4)
     stg.delete_weight(1, Timestamp::from_unix_millis(4).unwrap())?;
@@ -377,7 +377,7 @@ fn test_get_food_list() -> Result<()> {
 
     // Get empty food list
     let res = stg.get_food_list();
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     // Set food
     let f1 = Food {
@@ -454,7 +454,7 @@ fn test_delete_food() -> Result<()> {
 
     // Get food list
     let res = stg.get_food_list();
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     Ok(())
 }
@@ -513,7 +513,7 @@ fn test_find_food() -> Result<()> {
 
     // Find empty result
     let res = stg.find_food("some food");
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     // Set food
     let f1 = Food {
@@ -677,7 +677,7 @@ fn test_get_sport_list() -> Result<()> {
 
     // Get empty sport list
     let res = stg.get_sport_list();
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     // Set sport
     let s1 = Sport {
@@ -734,7 +734,7 @@ fn test_delete_sport() -> Result<()> {
 
     // Get sport list
     let res = stg.get_sport_list();
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     Ok(())
 }
@@ -861,7 +861,7 @@ fn test_get_sport_activity_report() -> Result<()> {
         Timestamp::from_unix_millis(1).unwrap(),
         Timestamp::from_unix_millis(2).unwrap(),
     );
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     // Set data
     stg.set_sport(&Sport {
@@ -976,7 +976,7 @@ fn test_delete_sport_activity() -> Result<()> {
         Timestamp::from_unix_millis(1).unwrap(),
         Timestamp::from_unix_millis(2).unwrap(),
     );
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     Ok(())
 }
@@ -1128,7 +1128,7 @@ fn test_get_bundle_list() -> Result<()> {
 
     // Get empty bundle list
     let res = stg.get_bundle_list(1);
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
 
     // Add bundle to DB
     stg.raw_execute(
@@ -1606,7 +1606,7 @@ fn test_delete_journal() -> Result<()> {
 }
 
 #[test]
-fn test_get_journal_report() -> Result<()> {
+fn test_get_journal_report_and_food_avg_weight() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;
 
@@ -1616,7 +1616,16 @@ fn test_get_journal_report() -> Result<()> {
         Timestamp::from_unix_millis(1).unwrap(),
         Timestamp::from_unix_millis(1).unwrap(),
     );
-    assert!(stg.is_storage_error(StorageError::EmptyList, &res.unwrap_err()));
+    assert!(stg.is_storage_error(StorageError::EmptyResult, &res.unwrap_err()));
+
+    // Get empty avg weight
+    let res = stg.get_journal_food_avg_weight(
+        1,
+        "food",
+        Timestamp::from_unix_millis(1).unwrap(),
+        Timestamp::from_unix_millis(1).unwrap(),
+    )?;
+    assert_eq!(0.0, res);
 
     // Set data
     stg.set_food(&Food {
@@ -1787,6 +1796,15 @@ fn test_get_journal_report() -> Result<()> {
         ],
         res
     );
+
+    // Get avg weight
+    let res = stg.get_journal_food_avg_weight(
+        1,
+        "key_aaa",
+        Timestamp::from_unix_millis(1).unwrap(),
+        Timestamp::from_unix_millis(2).unwrap(),
+    )?;
+    assert_eq!(100.0, res);
 
     Ok(())
 }

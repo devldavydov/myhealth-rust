@@ -138,7 +138,7 @@ async fn sport_list(bot: Bot, chat_id: ChatId, stg: Arc<Box<dyn Storage>>) -> Ha
     let f_lst = match stg.get_sport_list() {
         Err(err) => {
             log::error!("sport list error: {err}");
-            if stg.is_storage_error(StorageError::EmptyList, &err) {
+            if stg.is_storage_error(StorageError::EmptyResult, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;
@@ -351,7 +351,7 @@ async fn sport_activity_report(
         Ok(res) => res,
         Err(err) => {
             log::error!("set sport activity error: {err}");
-            if stg.is_storage_error(StorageError::EmptyList, &err) {
+            if stg.is_storage_error(StorageError::EmptyResult, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;

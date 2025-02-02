@@ -187,6 +187,16 @@ pub const JOURNAL_REPORT: &str = "
         f.name
 ";
 
+pub const JOURNAL_FOOD_AVG_WEIGHT: &str = "
+    SELECT coalesce(avg(foodweight), 0.0) AS avg_food_weight
+    FROM journal j
+    WHERE
+        j.user_id = ?1 AND
+        j.foodkey = ?2 AND
+        j.timestamp >= ?3 AND
+        j.timestamp <= ?4
+";
+
 //
 // Bundle
 //

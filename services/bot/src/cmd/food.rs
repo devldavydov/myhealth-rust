@@ -181,7 +181,7 @@ async fn food_list(bot: Bot, chat_id: ChatId, stg: Arc<Box<dyn Storage>>) -> Han
     let f_lst = match stg.get_food_list() {
         Err(err) => {
             log::error!("food list error: {err}");
-            if stg.is_storage_error(StorageError::EmptyList, &err) {
+            if stg.is_storage_error(StorageError::EmptyResult, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;
@@ -253,7 +253,7 @@ async fn food_find(
     let food = match stg.find_food(args.first().unwrap()) {
         Err(err) => {
             log::error!("find food error: {err}");
-            if stg.is_storage_error(StorageError::EmptyList, &err) {
+            if stg.is_storage_error(StorageError::EmptyResult, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;

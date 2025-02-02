@@ -181,7 +181,7 @@ async fn weight_list(
     let w_lst = match stg.get_weight_list(user_id, ts_from.clone(), ts_to.clone()) {
         Err(err) => {
             log::error!("weight list error: {err}");
-            if stg.is_storage_error(StorageError::EmptyList, &err) {
+            if stg.is_storage_error(StorageError::EmptyResult, &err) {
                 bot.send_message(chat_id, ERR_EMPTY).await?;
             } else {
                 bot.send_message(chat_id, ERR_INTERNAL).await?;

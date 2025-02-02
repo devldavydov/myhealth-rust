@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 
-use chrono::{DateTime, FixedOffset, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime, NaiveTime, TimeZone, Utc};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Timestamp(DateTime<FixedOffset>);
@@ -41,6 +41,10 @@ impl Timestamp {
     pub fn start_of_day(&self) -> Self {
         self.0.with_time(NaiveTime::MIN).unwrap().into()
     }
+
+    pub fn sub(&self, dt: Duration) -> Self {
+        (self.0 - dt).into()
+    }
 }
 
 impl From<DateTime<FixedOffset>> for Timestamp {
@@ -76,6 +80,18 @@ mod test {
             1734739200000,
             Timestamp::parse_date("21.12.2024", "%d.%m.%Y", chrono_tz::UTC)?.unix_millis()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub() -> Result<()> {
+        let ts1 = Timestamp::parse_date("21.12.2024", "%d.%m.%Y", chrono_tz::Europe::Moscow)?;
+
+        let ts2 = ts1.sub(Duration::days(20));
+
+        assert_eq!(ts1.unix_millis(), 1734728400000);
+        assert_eq!(ts2.unix_millis(), 1733000400000);
 
         Ok(())
     }
