@@ -2,6 +2,7 @@ mod bundle;
 mod cal_calc;
 mod food;
 mod journal;
+mod maintenance;
 mod sport;
 mod user_settings;
 mod weight;
@@ -103,6 +104,16 @@ pub async fn process_command(
                     "cc" => {
                         cal_calc::process_cal_calc_command(bot, msg.chat.id, parts[1..].to_vec())
                             .await?;
+                    }
+                    "m" => {
+                        maintenance::process_maintenance(
+                            bot,
+                            msg.chat.id,
+                            parts[1..].to_vec(),
+                            stg,
+                            tz,
+                        )
+                        .await?;
                     }
                     _ => {
                         log::error!("unknown command");

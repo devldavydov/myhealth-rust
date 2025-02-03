@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -16,9 +14,13 @@ pub struct Backup {
     pub bundle: Vec<BundleBackup>,
     #[serde(rename = "journal")]
     pub journal: Vec<JournalBackup>,
+    #[serde(rename = "sport")]
+    pub sport: Vec<SportBackup>,
+    #[serde(rename = "sport_activity")]
+    pub sport_activity: Vec<SportActivityBackup>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct WeightBackup {
     #[serde(rename = "user_id")]
     pub user_id: i64,
@@ -28,7 +30,7 @@ pub struct WeightBackup {
     pub value: f64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct FoodBackup {
     #[serde(rename = "key")]
     pub key: String,
@@ -48,7 +50,7 @@ pub struct FoodBackup {
     pub comment: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct UserSettingsBackup {
     #[serde(rename = "user_id")]
     pub user_id: i64,
@@ -56,26 +58,48 @@ pub struct UserSettingsBackup {
     pub cal_limit: f64,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct BundleBackup {
     #[serde(rename = "user_id")]
     pub user_id: i64,
     #[serde(rename = "key")]
     pub key: String,
     #[serde(rename = "data")]
-    pub data: HashMap<String, f64>,
+    pub data: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct JournalBackup {
     #[serde(rename = "user_id")]
     pub user_id: i64,
     #[serde(rename = "timestamp")]
     pub timestamp: i64,
     #[serde(rename = "meal")]
-    pub meal: i8,
+    pub meal: u8,
     #[serde(rename = "food_key")]
     pub food_key: String,
     #[serde(rename = "food_weight")]
     pub food_weight: f64,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct SportBackup {
+    #[serde(rename = "key")]
+    pub key: String,
+    #[serde(rename = "name")]
+    pub name: String,
+    #[serde(rename = "comment")]
+    pub comment: String,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct SportActivityBackup {
+    #[serde(rename = "user_id")]
+    pub user_id: i64,
+    #[serde(rename = "sport_key")]
+    pub sport_key: String,
+    #[serde(rename = "timestamp")]
+    pub timestamp: i64,
+    #[serde(rename = "sets")]
+    pub sets: String,
 }

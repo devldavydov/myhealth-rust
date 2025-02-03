@@ -44,6 +44,12 @@ pub const SELECT_WEIGHT_LIST: &str = "
         timestamp
 ";
 
+pub const SELECT_WEIGHT_FOR_BACKUP: &str = "
+    SELECT user_id, timestamp, value
+    FROM weight
+    ORDER BY user_id, timestamp
+";
+
 pub const DELETE_WEIGHT: &str = "
     DELETE FROM weight
     WHERE
@@ -101,7 +107,15 @@ pub const SELECT_FOOD_LIST: &str = "
         key, name, brand, cal100,
         prot100, fat100, carb100, comment
     FROM food
-    ORDER BY name
+    ORDER BY name, key
+";
+
+pub const SELECT_FOOD_FOR_BACKUP: &str = "
+    SELECT 
+        key, name, brand, cal100,
+        prot100, fat100, carb100, comment
+    FROM food
+    ORDER BY key
 ";
 
 pub const DELETE_FOOD: &str = "
@@ -197,6 +211,12 @@ pub const JOURNAL_FOOD_AVG_WEIGHT: &str = "
         j.timestamp <= ?4
 ";
 
+pub const SELECT_JOURNAL_FOR_BACKUP: &str = "
+    SELECT user_id, timestamp, meal, foodkey, foodweight
+    from journal
+    ORDER BY user_id, timestamp, meal, foodkey
+";
+
 //
 // Bundle
 //
@@ -226,6 +246,12 @@ pub const SELECT_BUNDLE_LIST: &str = "
 pub const SELECT_ALL_BUNDLES: &str = "
     SELECT key, data
     FROM bundle
+";
+
+pub const SELECT_BUNDLES_FOR_BACKUP: &str = "
+    SELECT user_id, key, data
+    FROM bundle
+    ORDER BY user_id, key
 ";
 
 pub const UPSERT_BUNDLE: &str = "
@@ -258,6 +284,12 @@ pub const SELECT_USER_SETTINGS: &str = "
     SELECT cal_limit
     FROM user_settings
     WHERE user_id = ?1
+";
+
+pub const SELECT_USER_SETTINGS_FOR_BACKUP: &str = "
+    SELECT user_id, cal_limit
+    FROM user_settings
+    ORDER BY user_id
 ";
 
 pub const UPSERT_USER_SETTINGS: &str = "
@@ -294,6 +326,13 @@ pub const SELECT_SPORT_LIST: &str = "
         key, name, comment
     FROM sport
     ORDER BY name
+";
+
+pub const SELECT_SPORT_FOR_BACKUP: &str = "
+    SELECT 
+        key, name, comment
+    FROM sport
+    ORDER BY key
 ";
 
 pub const DELETE_SPORT: &str = "
@@ -349,6 +388,12 @@ pub const SELECT_SPORT_ACTIVITY_REPORT: &str = "
     ORDER BY
         sa.timestamp,
         s.name
+";
+
+pub const SELECT_SPORT_ACTIVITY_FOR_BACKUP: &str = "
+    SELECT user_id, timestamp, sport_key, sets
+    FROM sport_activity 
+    ORDER BY user_id, timestamp, sport_key
 ";
 
 pub const DELETE_SPORT_ACTIVITY: &str = "

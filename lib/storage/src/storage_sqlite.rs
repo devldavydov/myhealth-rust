@@ -5,8 +5,12 @@ use std::sync::Mutex;
 use crate::{Storage, StorageError};
 use anyhow::{anyhow, bail, ensure, Context, Error, Result};
 use model::{
-    backup::Backup, Bundle, Food, Journal, JournalReport, Meal, Sport, SportActivity,
-    SportActivityReport, UserSettings, Weight,
+    backup::{
+        Backup, BundleBackup, FoodBackup, JournalBackup, SportActivityBackup, SportBackup,
+        UserSettingsBackup, WeightBackup,
+    },
+    Bundle, Food, Journal, JournalReport, Meal, Sport, SportActivity, SportActivityReport,
+    UserSettings, Weight,
 };
 use rusqlite::{
     functions::FunctionFlags, params, types::Value, Connection, Error::SqliteFailure, Params,
@@ -879,6 +883,130 @@ impl Storage for StorageSqlite {
     // Backup/Restore
     //
 
+    fn backup(&self) -> Result<Backup> {
+        // Weight
+        let db_res = self
+            .raw_query(queries::SELECT_WEIGHT_FOR_BACKUP, params![])
+            .context("select weight backup query")?;
+
+        let mut weight_backup = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            weight_backup.push(WeightBackup {
+                user_id: Self::get_integer(&row, "user_id").context("get user_id field")?,
+                timestamp: Self::get_timestamp(&row, "timestamp")
+                    .context("get timestamp field")?
+                    .unix_millis(),
+                value: Self::get_float(&row, "value").context("get value field")?,
+            });
+        }
+
+        // Food
+        let db_res = self
+            .raw_query(queries::SELECT_FOOD_FOR_BACKUP, params![])
+            .context("select food backup query")?;
+
+        let mut food_backup = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            food_backup.push(FoodBackup {
+                key: Self::get_string(&row, "key").context("get key field")?,
+                name: Self::get_string(&row, "name").context("get name field")?,
+                brand: Self::get_string(&row, "brand").context("get brand field")?,
+                cal100: Self::get_float(&row, "cal100").context("get cal100 field")?,
+                prot100: Self::get_float(&row, "prot100").context("get prot100 field")?,
+                fat100: Self::get_float(&row, "fat100").context("get fat100 field")?,
+                carb100: Self::get_float(&row, "carb100").context("get carb100 field")?,
+                comment: Self::get_string(&row, "comment").context("get comment field")?,
+            });
+        }
+
+        // User settings
+        let db_res = self
+            .raw_query(queries::SELECT_USER_SETTINGS_FOR_BACKUP, params![])
+            .context("select user settings backup query")?;
+
+        let mut us_backup = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            us_backup.push(UserSettingsBackup {
+                user_id: Self::get_integer(&row, "user_id").context("get user_id field")?,
+                cal_limit: Self::get_float(&row, "cal_limit").context("get cal_limit field")?,
+            });
+        }
+
+        // Bundles
+        let db_res: Vec<HashMap<String, Value>> = self
+            .raw_query(queries::SELECT_BUNDLES_FOR_BACKUP, params![])
+            .context("select bundles backup query")?;
+
+        let mut bundle_backup = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            bundle_backup.push(BundleBackup {
+                user_id: Self::get_integer(&row, "user_id").context("get user_id field")?,
+                key: Self::get_string(&row, "key").context("get key field")?,
+                data: Self::get_string(&row, "data").context("get bundle data field")?,
+            });
+        }
+
+        // Journal
+        let db_res: Vec<HashMap<String, Value>> = self
+            .raw_query(queries::SELECT_JOURNAL_FOR_BACKUP, params![])
+            .context("select journal backup query")?;
+
+        let mut journal_backup = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            journal_backup.push(JournalBackup {
+                user_id: Self::get_integer(&row, "user_id").context("get user_id field")?,
+                timestamp: Self::get_timestamp(&row, "timestamp")
+                    .context("get timestamp field")?
+                    .unix_millis(),
+                meal: Self::get_integer(&row, "meal").context("get meal field")? as u8,
+                food_key: Self::get_string(&row, "foodkey").context("get foodkey field")?,
+                food_weight: Self::get_float(&row, "foodweight").context("get foodweight field")?,
+            });
+        }
+
+        // Sport
+        let db_res: Vec<HashMap<String, Value>> = self
+            .raw_query(queries::SELECT_SPORT_FOR_BACKUP, params![])
+            .context("select sport backup query")?;
+
+        let mut sport_backup = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            sport_backup.push(SportBackup {
+                key: Self::get_string(&row, "key").context("get key field")?,
+                name: Self::get_string(&row, "name").context("get name field")?,
+                comment: Self::get_string(&row, "comment").context("get comment field")?,
+            });
+        }
+
+        // Sport activity
+        let db_res: Vec<HashMap<String, Value>> = self
+            .raw_query(queries::SELECT_SPORT_ACTIVITY_FOR_BACKUP, params![])
+            .context("select sport activity backup query")?;
+
+        let mut sa_backup = Vec::with_capacity(db_res.len());
+        for row in db_res {
+            sa_backup.push(SportActivityBackup {
+                user_id: Self::get_integer(&row, "user_id").context("get user_id field")?,
+                timestamp: Self::get_timestamp(&row, "timestamp")
+                    .context("get timestamp field")?
+                    .unix_millis(),
+                sport_key: Self::get_string(&row, "sport_key").context("get sport_key field")?,
+                sets: Self::get_string(&row, "sets").context("get sets field")?,
+            });
+        }
+
+        Ok(Backup {
+            timestamp: Timestamp::now().unix_millis(),
+            food: food_backup,
+            weight: weight_backup,
+            user_settings: us_backup,
+            bundle: bundle_backup,
+            journal: journal_backup,
+            sport: sport_backup,
+            sport_activity: sa_backup,
+        })
+    }
+
     fn restore(&self, backup: &Backup) -> Result<()> {
         for w in &backup.weight {
             self.raw_execute(
@@ -910,12 +1038,10 @@ impl Storage for StorageSqlite {
         }
 
         for b in &backup.bundle {
-            let data =
-                serde_json::to_string(&json!(b.data)).context("convert bundle data to JSON")?;
             self.raw_execute(
                 queries::UPSERT_BUNDLE,
                 false,
-                params![b.user_id, b.key, data],
+                params![b.user_id, b.key, b.data],
             )
             .context("exec upsert backup bundle")?;
         }
@@ -927,6 +1053,24 @@ impl Storage for StorageSqlite {
                 params![j.user_id, j.timestamp, j.meal, j.food_key, j.food_weight],
             )
             .context("exec upsert backup journal")?;
+        }
+
+        for s in &backup.sport {
+            self.raw_execute(
+                queries::UPSERT_SPORT,
+                false,
+                params![s.key, s.name, s.comment],
+            )
+            .context("exec upsert backup sport")?;
+        }
+
+        for sa in &backup.sport_activity {
+            self.raw_execute(
+                queries::UPSERT_SPORT_ACTIVITY,
+                false,
+                params![sa.user_id, sa.timestamp, sa.sport_key, sa.sets],
+            )
+            .context("exec upsert backup sport activity")?;
         }
 
         Ok(())

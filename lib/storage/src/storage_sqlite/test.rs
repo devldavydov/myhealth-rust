@@ -1814,12 +1814,11 @@ fn test_get_journal_report_and_food_avg_weight() -> Result<()> {
 //
 
 #[test]
-fn test_restore() -> Result<()> {
+fn test_backup_restore() -> Result<()> {
     let db_file = NamedTempFile::new()?;
     let stg = StorageSqlite::new(db_file.path())?;
 
-    // Do restore
-    stg.restore(&Backup {
+    let backup = Backup {
         timestamp: 1,
         weight: vec![
             WeightBackup {
@@ -1845,16 +1844,6 @@ fn test_restore() -> Result<()> {
         ],
         food: vec![
             FoodBackup {
-                key: "key2".into(),
-                name: "Food 2".into(),
-                brand: "Brand2".into(),
-                cal100: 5.5,
-                prot100: 6.6,
-                fat100: 7.7,
-                carb100: 8.8,
-                comment: "Comment2".into(),
-            },
-            FoodBackup {
                 key: "key1".into(),
                 name: "Food 1".into(),
                 brand: "Brand 1".into(),
@@ -1865,14 +1854,14 @@ fn test_restore() -> Result<()> {
                 comment: "Comment1".into(),
             },
             FoodBackup {
-                key: "key4".into(),
-                name: "Еда 4".into(),
-                brand: "Брэнд 4".into(),
-                cal100: 100.100,
-                prot100: 200.200,
-                fat100: 300.300,
-                carb100: 400.400,
-                comment: "Комментарий 4".into(),
+                key: "key2".into(),
+                name: "Food 2".into(),
+                brand: "Brand2".into(),
+                cal100: 5.5,
+                prot100: 6.6,
+                fat100: 7.7,
+                carb100: 8.8,
+                comment: "Comment2".into(),
             },
             FoodBackup {
                 key: "key3".into(),
@@ -1883,6 +1872,16 @@ fn test_restore() -> Result<()> {
                 fat100: 30.30,
                 carb100: 40.40,
                 comment: "Комментарий 3".into(),
+            },
+            FoodBackup {
+                key: "key4".into(),
+                name: "Еда 4".into(),
+                brand: "Брэнд 4".into(),
+                cal100: 100.100,
+                prot100: 200.200,
+                fat100: 300.300,
+                carb100: 400.400,
+                comment: "Комментарий 4".into(),
             },
         ],
         user_settings: vec![
@@ -1899,12 +1898,12 @@ fn test_restore() -> Result<()> {
             BundleBackup {
                 user_id: 1,
                 key: "bundle1".into(),
-                data: HashMap::from([("key1".into(), 100.0)]),
+                data: r#"{"key1":100.0}"#.into(),
             },
             BundleBackup {
                 user_id: 1,
                 key: "bundle2".into(),
-                data: HashMap::from([("key2".into(), 100.0), ("bundle1".into(), 0.0)]),
+                data: r#"{"key2":100.0,"bundle1":0.0}"#.into(),
             },
         ],
         journal: vec![
@@ -1923,7 +1922,47 @@ fn test_restore() -> Result<()> {
                 food_weight: 200.0,
             },
         ],
-    })?;
+        sport: vec![
+            SportBackup {
+                key: "sport1".into(),
+                name: "Sport 1".into(),
+                comment: "Sport 1".into(),
+            },
+            SportBackup {
+                key: "sport2".into(),
+                name: "Sport 2".into(),
+                comment: "Sport 2".into(),
+            },
+            SportBackup {
+                key: "sport3".into(),
+                name: "Sport 3".into(),
+                comment: "Sport 3".into(),
+            },
+        ],
+        sport_activity: vec![
+            SportActivityBackup {
+                user_id: 1,
+                sport_key: "sport1".into(),
+                timestamp: 1,
+                sets: "[1,2,3]".into(),
+            },
+            SportActivityBackup {
+                user_id: 1,
+                sport_key: "sport2".into(),
+                timestamp: 1,
+                sets: "[4,5,6]".into(),
+            },
+            SportActivityBackup {
+                user_id: 2,
+                sport_key: "sport3".into(),
+                timestamp: 2,
+                sets: "[10]".into(),
+            },
+        ],
+    };
+
+    // Do restore
+    stg.restore(&backup)?;
 
     // Check weight list for user 1
     let res = stg.get_weight_list(
@@ -2034,7 +2073,7 @@ fn test_restore() -> Result<()> {
         res
     );
 
-    // Check journa
+    // Check journal
     let res = stg.get_journal_report(
         1,
         Timestamp::from_unix_millis(1).unwrap(),
@@ -2069,6 +2108,74 @@ fn test_restore() -> Result<()> {
         ],
         res
     );
+
+    // Check sport
+    let res = stg.get_sport_list()?;
+    assert_eq!(
+        vec![
+            Sport {
+                key: "sport1".into(),
+                name: "Sport 1".into(),
+                comment: "Sport 1".into(),
+            },
+            Sport {
+                key: "sport2".into(),
+                name: "Sport 2".into(),
+                comment: "Sport 2".into(),
+            },
+            Sport {
+                key: "sport3".into(),
+                name: "Sport 3".into(),
+                comment: "Sport 3".into(),
+            }
+        ],
+        res
+    );
+
+    // Check sport activity
+    let res = stg.get_sport_activity_report(
+        1,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Timestamp::from_unix_millis(2).unwrap(),
+    )?;
+    assert_eq!(
+        vec![
+            SportActivityReport {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sport_name: "Sport 1".into(),
+                sets: vec![1, 2, 3],
+            },
+            SportActivityReport {
+                timestamp: Timestamp::from_unix_millis(1).unwrap(),
+                sport_name: "Sport 2".into(),
+                sets: vec![4, 5, 6],
+            }
+        ],
+        res
+    );
+    let res = stg.get_sport_activity_report(
+        2,
+        Timestamp::from_unix_millis(1).unwrap(),
+        Timestamp::from_unix_millis(2).unwrap(),
+    )?;
+    assert_eq!(
+        vec![SportActivityReport {
+            timestamp: Timestamp::from_unix_millis(2).unwrap(),
+            sport_name: "Sport 3".into(),
+            sets: vec![10],
+        },],
+        res
+    );
+
+    // Check backup
+    let backup2 = stg.backup()?;
+    assert_eq!(backup.food, backup2.food);
+    assert_eq!(backup.weight, backup2.weight);
+    assert_eq!(backup.user_settings, backup2.user_settings);
+    assert_eq!(backup.bundle, backup2.bundle);
+    assert_eq!(backup.journal, backup2.journal);
+    assert_eq!(backup.sport, backup2.sport);
+    assert_eq!(backup.sport_activity, backup2.sport_activity);
 
     Ok(())
 }
