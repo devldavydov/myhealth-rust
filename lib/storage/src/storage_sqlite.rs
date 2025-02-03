@@ -383,8 +383,22 @@ impl Storage for StorageSqlite {
         }
 
         // Delete food
-        Self::raw_execute_tx(&tx, queries::DELETE_FOOD, false, params![key])
-            .context("exec delete food")?;
+        if let Err(err) = Self::raw_execute_tx(&tx, queries::DELETE_FOOD, false, params![key])
+            .context("exec delete food")
+        {
+            for cause in err.chain() {
+                if let Some(SqliteFailure(_, Some(val))) = cause.downcast_ref::<rusqlite::Error>() {
+                    if val == "FOREIGN KEY constraint failed" {
+                        bail!(StorageError::FoodIsUsed)
+                    };
+
+                    bail!(err);
+                }
+            }
+
+            bail!(err);
+        };
+
         tx.commit().context("failed to commit transaction")?;
 
         Ok(())
