@@ -1844,6 +1844,7 @@ fn test_backup_restore() -> Result<()> {
         ],
         food: vec![
             FoodBackup {
+                user_id: 1,
                 key: "key1".into(),
                 name: "Food 1".into(),
                 brand: "Brand 1".into(),
@@ -1854,6 +1855,7 @@ fn test_backup_restore() -> Result<()> {
                 comment: "Comment1".into(),
             },
             FoodBackup {
+                user_id: 1,
                 key: "key2".into(),
                 name: "Food 2".into(),
                 brand: "Brand2".into(),
@@ -1864,6 +1866,7 @@ fn test_backup_restore() -> Result<()> {
                 comment: "Comment2".into(),
             },
             FoodBackup {
+                user_id: 1,
                 key: "key3".into(),
                 name: "Еда 3".into(),
                 brand: "Брэнд 3".into(),
@@ -1874,6 +1877,7 @@ fn test_backup_restore() -> Result<()> {
                 comment: "Комментарий 3".into(),
             },
             FoodBackup {
+                user_id: 1,
                 key: "key4".into(),
                 name: "Еда 4".into(),
                 brand: "Брэнд 4".into(),
@@ -1924,16 +1928,19 @@ fn test_backup_restore() -> Result<()> {
         ],
         sport: vec![
             SportBackup {
+                user_id: 1,
                 key: "sport1".into(),
                 name: "Sport 1".into(),
                 comment: "Sport 1".into(),
             },
             SportBackup {
+                user_id: 1,
                 key: "sport2".into(),
                 name: "Sport 2".into(),
                 comment: "Sport 2".into(),
             },
             SportBackup {
+                user_id: 1,
                 key: "sport3".into(),
                 name: "Sport 3".into(),
                 comment: "Sport 3".into(),
@@ -2168,7 +2175,7 @@ fn test_backup_restore() -> Result<()> {
     );
 
     // Check backup
-    let backup2 = stg.backup()?;
+    let backup2 = stg.backup(1)?;
     assert_eq!(backup.food, backup2.food);
     assert_eq!(backup.weight, backup2.weight);
     assert_eq!(backup.user_settings, backup2.user_settings);

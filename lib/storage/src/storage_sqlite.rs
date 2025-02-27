@@ -897,7 +897,7 @@ impl Storage for StorageSqlite {
     // Backup/Restore
     //
 
-    fn backup(&self) -> Result<Backup> {
+    fn backup(&self, user_id: i64) -> Result<Backup> {
         // Weight
         let db_res = self
             .raw_query(queries::SELECT_WEIGHT_FOR_BACKUP, params![])
@@ -922,6 +922,7 @@ impl Storage for StorageSqlite {
         let mut food_backup = Vec::with_capacity(db_res.len());
         for row in db_res {
             food_backup.push(FoodBackup {
+                user_id,
                 key: Self::get_string(&row, "key").context("get key field")?,
                 name: Self::get_string(&row, "name").context("get name field")?,
                 brand: Self::get_string(&row, "brand").context("get brand field")?,
@@ -986,6 +987,7 @@ impl Storage for StorageSqlite {
         let mut sport_backup = Vec::with_capacity(db_res.len());
         for row in db_res {
             sport_backup.push(SportBackup {
+                user_id,
                 key: Self::get_string(&row, "key").context("get key field")?,
                 name: Self::get_string(&row, "name").context("get name field")?,
                 comment: Self::get_string(&row, "comment").context("get comment field")?,

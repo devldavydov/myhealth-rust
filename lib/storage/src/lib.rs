@@ -84,7 +84,7 @@ pub trait Storage: Send + Sync {
     ) -> Result<Vec<SportActivityReport>>;
 
     // Backup/Restore
-    fn backup(&self) -> Result<Backup>;
+    fn backup(&self, user_id: i64) -> Result<Backup>;
     fn restore(&self, backup: &Backup) -> Result<()>;
 
     // Error

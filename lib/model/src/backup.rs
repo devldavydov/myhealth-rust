@@ -32,6 +32,8 @@ pub struct WeightBackup {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct FoodBackup {
+    #[serde(rename = "user_id")]
+    pub user_id: i64,
     #[serde(rename = "key")]
     pub key: String,
     #[serde(rename = "name")]
@@ -84,6 +86,8 @@ pub struct JournalBackup {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct SportBackup {
+    #[serde(rename = "user_id")]
+    pub user_id: i64,
     #[serde(rename = "key")]
     pub key: String,
     #[serde(rename = "name")]

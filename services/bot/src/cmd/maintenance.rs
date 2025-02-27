@@ -21,6 +21,7 @@ use super::format_timestamp;
 
 pub async fn process_maintenance(
     bot: Bot,
+    user_id: i64,
     chat_id: ChatId,
     args: Vec<&str>,
     stg: Arc<Box<dyn Storage>>,
@@ -34,7 +35,7 @@ pub async fn process_maintenance(
 
     match *args.first().unwrap() {
         "backup" => {
-            backup(bot, chat_id, stg, tz).await?;
+            backup(bot, user_id, chat_id, stg, tz).await?;
         }
         _ => {
             log::error!("unknown command");
@@ -45,9 +46,9 @@ pub async fn process_maintenance(
     Ok(())
 }
 
-async fn backup(bot: Bot, chat_id: ChatId, stg: Arc<Box<dyn Storage>>, tz: Tz) -> HandlerResult {
+async fn backup(bot: Bot, user_id: i64, chat_id: ChatId, stg: Arc<Box<dyn Storage>>, tz: Tz) -> HandlerResult {
     // Get storage data for backup
-    let res = stg.backup();
+    let res = stg.backup(user_id);
     if let Err(err) = res {
         log::error!("backup error: {err}");
         bot.send_message(chat_id, ERR_INTERNAL).await?;

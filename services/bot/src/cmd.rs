@@ -108,6 +108,7 @@ pub async fn process_command(
                     "m" => {
                         maintenance::process_maintenance(
                             bot,
+                            user_id,
                             msg.chat.id,
                             parts[1..].to_vec(),
                             stg,
